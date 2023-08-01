@@ -1,23 +1,39 @@
 {
-  "name": "orm_json",
+  "name": "orm-json",
   "version": "1.0.0",
   "description": "",
   "author": {
     "name": "Amissi Ec-son",
     "email": "useniecson@gmail.com"
   },
-  "main": "./dist/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "tsnd  --respawn src/test.ts",
+    "dev": "tsnd  --respawn dev/test.ts",
     "test": "jest --watch"
   },
   "keywords": [
+    "ec",
+    "database",
+    "db",
     "orm",
-    "json"
+    "json",
+    "NoSQL"
   ],
-  "license": "ISC",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ec-son/orm-json.git",
+    "directory": "packages/jest"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.3",
+    "@types/node": "^20.4.8",
     "jest": "^29.6.1",
     "ts-jest": "^29.1.1",
     "ts-node-dev": "^2.0.0"

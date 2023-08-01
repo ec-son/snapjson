@@ -1,2 +1,1 @@
-export * from "./ec_orm_json";
-export * from "./ec_entity";
+export * from "./lib/orm-json";
