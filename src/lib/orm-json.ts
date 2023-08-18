@@ -1,6 +1,6 @@
 import { Collection } from "./collection";
-import { EcDbType, MetadataType } from "../type/ec_type";
 import { loadData, saveData, sizeFile } from "../utils/utils.func";
+import { DataBaseType, MetadataType } from "../type/orm.type";
 
 export class OrmJson {
   private _pathDB: string;
@@ -18,13 +18,15 @@ export class OrmJson {
   /**
    * Create a new collection.
    * @param {string | Object} collection The name of the collection or an object with the following properties:
-   *  - name The name of the collection.
+   *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
    * @param {boolean} force [force=false] If true, existing collection with the same name will be overwritten.
    * @returns The name of collection
    */
   async createCollection<T>(
-    collection: string | { name: string; uniqueKeys?: Array<keyof T> },
+    collection:
+      | string
+      | { collectionName: string; uniqueKeys?: Array<keyof T> },
     force?: boolean
   ): Promise<string> {
     return this.creatingCollection(collection, force) as Promise<string>;
@@ -33,13 +35,15 @@ export class OrmJson {
   /**
    * Creates new collections.
    * @param collections Array of collection names or Array of objects, each representing a collection with the following properties:
-   *  - name The name of the collection.
+   *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
    * @param force [force=false] If true, existing collection with the same name will be overwritten.
    * @returns An array of collection names.
    */
   async createCollections<T>(
-    collections: string[] | { name: string; uniqueKeys?: Array<keyof T> }[],
+    collections:
+      | string[]
+      | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
     force?: boolean
   ): Promise<string[]> {
     return this.creatingCollection(collections, force) as Promise<string[]>;
@@ -60,7 +64,7 @@ export class OrmJson {
       let unique: string[] = [];
 
       if (typeof collection === "object") {
-        name = collection["name"];
+        name = collection["collectionName"];
         unique = (collection["uniqueKeys"] as Array<any>) || [];
       } else name = collection;
 
@@ -206,7 +210,7 @@ export class OrmJson {
     return this._pathDB;
   }
 
-  private async loadData(load: boolean = true): Promise<EcDbType> {
+  private async loadData(load: boolean = true): Promise<DataBaseType> {
     const db = await loadData(this._pathDB);
     if (load) {
       this.loadDataLocally(db);
@@ -214,7 +218,7 @@ export class OrmJson {
     return db;
   }
 
-  private loadDataLocally(db: EcDbType) {
+  private loadDataLocally(db: DataBaseType) {
     this._collection = Object.keys(db);
     const findIndex = this._collection.findIndex(
       (collectionName) => collectionName === "__metadata__"
@@ -224,7 +228,7 @@ export class OrmJson {
       (db["__metadata__"] as Array<MetadataType<Record<string, any>>>) || [];
   }
 
-  private async saveData(data: EcDbType) {
+  private async saveData(data: DataBaseType) {
     saveData(this._pathDB, data);
   }
 }
@@ -232,7 +236,7 @@ export class OrmJson {
 /**
  * Get instance of collection
  * @param collectionName Name of collection
- * @param path path of database file
+ * @param path Path of database file
  * @returns Instance of the specified collection if found.
  * @throws If the collection is not found, an error will be thrown.
  */
@@ -246,32 +250,28 @@ export async function defineCollection<T extends Object>(
 
 /**
  * Create a new collection.
- * @param {string | Object} collection The name of the collection or an object with the following properties:
+ * @param {string | { name: string; uniqueKeys?: Array<keyof T> }} collection The name of the collection or an object with the following properties:
  *  - name The name of the collection.
  *  - uniqueKeys An array containing all unique keys in this collection.
- * @param {boolean} force [force=false] If true, existing collection with the same name will be overwritten.
- * @returns The name of collection
- */
-
-/**
- * Create a new collection.
- * @param {string | { name: string; uniqueKeys?: Array<keyof T> }} collection
- * @param path
- * @param force
+ * @param path Path of database file
+ * @param force [force=false] If true, existing collection with the same name will be overwritten.
+ * @returns Returns the name of collection
  */
 export async function createCollection<T>(
-  collection: string | { name: string; uniqueKeys?: Array<keyof T> },
+  collection: string | { collectionName: string; uniqueKeys?: Array<keyof T> },
   path?: string,
   force?: boolean
 ): Promise<string>;
 
 export async function createCollection<T>(
-  collections: string[] | { name: string; uniqueKeys?: Array<keyof T> }[],
+  collections:
+    | string[]
+    | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
   path?: string,
   force?: boolean
 ): Promise<string[]>;
 
-export async function createCollection<T>(
+export async function createCollection(
   collections: any,
   path?: string,
   force?: boolean
@@ -280,4 +280,28 @@ export async function createCollection<T>(
   if (Array.isArray(collections))
     return orm.createCollections(collections, force);
   return orm.createCollection(collections, force);
+}
+
+/**
+ *
+ * @param collections
+ * @param path
+ * @param force
+ * @returns
+ */
+
+/**
+ * Remove one or many collections.
+ * @param {string | string[]} collections Name of collection to be removed. It can be either a string for single collection or an array of string for multiple collections.
+ * @param path Path of database file
+ * @param force [force=false] If true, collections found with data will be removed.
+ * @returns The collections(e) that have been removed.
+ */
+export async function removeCollection(
+  collections: string | string[],
+  path?: string,
+  force: boolean = false
+): Promise<typeof collections | undefined> {
+  const orm = new OrmJson(path);
+  return orm.removeCollection(collections, force);
 }

@@ -1,21 +1,14 @@
-import { open, readFile, stat, mkdir } from "node:fs/promises";
+import { open, readFile, stat } from "node:fs/promises";
 import {
+  compare,
   defineDocument,
   formatSize,
+  isEqual,
   loadData,
   saveData,
   sizeFile,
 } from "../src/utils/utils.func";
-import { EcDbType } from "../src/type/ec_type";
-
-// jest.mock("util", () => {
-//   return {
-//     ...jest.requireActual("util"),
-//     promisify: jest.fn((fn) => {
-//       return fn;
-//     }),
-//   };
-// });
+import { DataBaseType } from "../src/type/orm.type";
 
 jest.mock("node:fs/promises", () => {
   return {
@@ -42,12 +35,14 @@ const path_db = "db.json";
  * defineDocument
  * sizeFile
  * formatSize
+ * isEqual
+ * compare
  */
 describe("saving data into database", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
-  const data: EcDbType = {} as EcDbType;
+  const data: DataBaseType = {} as DataBaseType;
 
   const table = [
     {
@@ -64,7 +59,7 @@ describe("saving data into database", () => {
   it.each(table)(
     "should save data into database",
     async ({ path, data, expected }) => {
-      await saveData(path, data as EcDbType);
+      await saveData(path, data as DataBaseType);
       expect(mockWriteFile).toHaveBeenNthCalledWith(1, ...expected);
     }
   );
@@ -124,27 +119,6 @@ describe("loading data from database", () => {
   });
 });
 
-// describe("checking if a file exists", () => {
-//   it("should return true if the file exists", async () => {
-//     await expect(isExistFile(path_db)).resolves.toBeTruthy();
-//   });
-
-//   const table2 = [
-//     { path_db: undefined, return_mock: true },
-//     { path_db, return_mock: false },
-//   ];
-
-//   it.each(table2)(
-//     "should return false if the file does not exist",
-//     async ({ path_db, return_mock }) => {
-//       (stat as unknown as jest.Mock).mockResolvedValue({
-//         isFile: () => return_mock,
-//       });
-//       await expect(isExistFile(path_db as string)).resolves.toBeFalsy();
-//     }
-//   );
-// });
-
 describe("define document", () => {
   it("should return an object with specified properties", () => {
     const document = { __id: 1, name: "name", age: 12 };
@@ -194,4 +168,50 @@ describe("format size", () => {
     );
     await expect(sizeFile(path_db)).rejects.toThrow();
   });
+});
+
+describe("isEqual function", () => {
+  const table1 = [
+    { a: 1, b: 2, expected: false },
+    { a: 1, b: 1, expected: true },
+    { a: "yes", b: "no", expected: false },
+    { a: new Date("2013/05/12"), b: new Date("2013/05/12"), expected: true },
+    { a: [1, 2, 3], b: [1, 2, 3], expected: true },
+    { a: [1, 2, 3], b: [3, 2, 1], expected: false },
+    { a: [1, 2, [3]], b: [1, 2, [3]], expected: true },
+  ];
+
+  it.each(table1)(
+    "should return boolean showing equality",
+    ({ a, b, expected }) => {
+      expect(isEqual(a, b)).toBe(expected);
+    }
+  );
+});
+
+describe("compare function", () => {
+  const table2 = [
+    { a: 1, b: 2, op: "gt", expected: false },
+    { a: 2, b: 1, op: "gt", expected: true },
+    { a: 1, b: 2, op: "gte", expected: false },
+    { a: 2, b: 1, op: "gte", expected: true },
+    { a: 1, b: 2, op: "lt", expected: true },
+    { a: 2, b: 1, op: "lt", expected: false },
+    { a: 1, b: 2, op: "lte", expected: true },
+    { a: 2, b: 1, op: "lte", expected: false },
+    { a: "yes", b: "no", op: "gt", expected: true },
+    {
+      a: new Date("2013/05/10"),
+      op: "lt",
+      b: new Date("2013/05/12"),
+      expected: true,
+    },
+  ];
+
+  it.each(table2)(
+    "should return boolean showing comparaison",
+    ({ a, b, op, expected }) => {
+      expect(compare(a, b, op as any)).toBe(expected);
+    }
+  );
 });

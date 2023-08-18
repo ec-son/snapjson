@@ -1,11 +1,11 @@
 import {
-  EcDbType,
   CollectionType,
+  DataBaseType,
   MetadataType,
-  EcOp,
-  EcOpArith,
-  ecOptionsRequest,
-} from "../type/ec_type";
+  QueryOneOptionType,
+  QueryOptionType,
+  QueryType,
+} from "../type/orm.type";
 import {
   defineDocument,
   formatSize,
@@ -13,6 +13,7 @@ import {
   saveData,
 } from "../utils/utils.func";
 import { Document } from "./document";
+import { Query } from "./query";
 
 export class Collection<
   T extends Object,
@@ -29,80 +30,83 @@ export class Collection<
 
   //SELECT
 
-  async findById(
+  async findById(__id: number): Promise<(Document<U> & U) | undefined>;
+
+  async findById<
+    X extends Array<keyof U> | undefined = undefined,
+    Y extends Object = X extends Array<keyof U>
+      ? { [K in X[number]]: K extends keyof U ? U[K] : never }
+      : U
+  >(
     __id: number,
-    opts?: Pick<
-      ecOptionsRequest<U>,
-      Exclude<keyof ecOptionsRequest<U>, "limit">
-    >
-  ): Promise<(Document<U> & Partial<U>) | undefined> {
-    return this.select(
-      { eq: { __id } as Partial<U> },
-      { ...opts, limit: 1 }
-    ) as Promise<(Document<U> & Partial<U>) | undefined>;
+    opts: X extends undefined ? QueryOneOptionType<U> : QueryOneOptionType<U, X>
+  ): Promise<(Document<Y> & Y) | undefined>;
+
+  async findById(__id: number, opts?: any): Promise<any> {
+    return this.select({ __id } as QueryType<Partial<U>>, {
+      ...opts,
+      limit: 1,
+    }) as Promise<(Document<any> & any) | undefined>;
   }
 
   async findOne(
-    query: EcOp<Partial<U>>,
-    opts?: Pick<
-      ecOptionsRequest<U>,
-      Exclude<keyof ecOptionsRequest<U>, "limit">
-    >
-  ): Promise<(Document<U> & Partial<U>) | undefined> {
-    return this.select(query, { ...opts, limit: 1 }) as Promise<
-      (Document<U> & Partial<U>) | undefined
-    >;
+    query: QueryType<Partial<U>>
+  ): Promise<(Document<U> & U) | undefined>;
+
+  async findOne<
+    X extends Array<keyof U> | undefined = undefined,
+    Y extends Object = X extends Array<keyof U>
+      ? { [K in X[number]]: K extends keyof U ? U[K] : never }
+      : U
+  >(
+    query: QueryType<Partial<U>>,
+    opts: X extends undefined ? QueryOneOptionType<U> : QueryOneOptionType<U, X>
+  ): Promise<(Document<Y> & Y) | undefined>;
+
+  async findOne(
+    query: QueryType<any>,
+    opts?: any
+  ): Promise<(Document<any> & any) | undefined> {
+    return this.select(query, {
+      ...opts,
+      limit: 1,
+    } as QueryOptionType<any>) as Promise<(Document<any> & any) | undefined>;
   }
 
+  async findMany(query: QueryType<Partial<U>>): Promise<Array<Document<U> & U>>;
+
+  async findMany<
+    X extends Array<keyof U> | undefined = undefined,
+    Y extends Object = X extends Array<keyof U>
+      ? { [K in X[number]]: K extends keyof U ? U[K] : never }
+      : U
+  >(
+    query: QueryType<Partial<U>>,
+    opts: X extends undefined ? QueryOptionType<U> : QueryOptionType<U, X>
+  ): Promise<Array<Document<Y> & Y>>;
+
   async findMany(
-    query: EcOp<Partial<U>>,
-    opts?: ecOptionsRequest<U>
-  ): Promise<Array<Document<U> & Partial<U>>> {
-    return this.select(query, opts) as Promise<Array<Document<U> & Partial<U>>>;
+    query: QueryType<Partial<U>>,
+    opts?: any
+  ): Promise<Array<Document<any> & any>> {
+    return this.select(query, opts) as Promise<Array<Document<any> & any>>;
   }
 
   private async select(
-    query: EcOp<Partial<U>>,
-    opts?: ecOptionsRequest<U>
-  ): Promise<
-    (Document<U> & Partial<U>) | Array<Document<U> & Partial<U>> | undefined
-  > {
-    const limit = opts?.limit || 0;
-
-    let result = structuredClone(await this.selectModel(query));
-    result.sort((a, b) => this.compare(a, b, opts?.sort));
-    if (opts?.select)
-      result = this.selectProperties(result, opts.select) as U[];
-    if (limit !== 1)
-      return limit < 1
-        ? (defineDocument(result, this.pathDB, this._collectionName) as Array<
-            Document<U> & Partial<U>
-          >)
-        : (defineDocument(
-            result.slice(0, limit),
-            this.pathDB,
-            this._collectionName
-          ) as Array<Document<U> & Partial<U>>);
-    else
-      return result.length > 0
-        ? (defineDocument(
-            result[0],
-            this.pathDB,
-            this._collectionName
-          ) as Document<U> & Partial<U>)
-        : undefined;
-  }
-
-  private async selectModel(query: EcOp<Partial<U>>): Promise<U[]> {
-    const op = this.getOp(query);
-    let result: U[] = [];
-
-    if (op === "or") {
-      result = await this.orOp(query);
-    } else if (op === "and") {
-      result = await this.andOp(query);
-    }
-    return result;
+    query: QueryType<any>,
+    opts?: QueryOptionType<any>
+  ): Promise<(Document<any> & any) | Array<Document<any> & any> | undefined> {
+    const collectionDB = await this.loadData();
+    const queryInstance = new Query(
+      query,
+      structuredClone(collectionDB),
+      opts as any
+    );
+    const result = queryInstance.getData();
+    if (!result) return undefined;
+    return defineDocument(result, this.pathDB, this._collectionName) as Array<
+      Document<any> & any
+    >;
   }
 
   // INSERT
@@ -119,7 +123,7 @@ export class Collection<
     return this.insert(data) as Promise<Document<U> & U>;
   }
 
-  async inserMany(data: T[]): Promise<Array<Document<U> & U>> {
+  async insertMany(data: T[]): Promise<Array<Document<U> & U>> {
     return this.insert(data) as Promise<Array<Document<U> & U>>;
   }
 
@@ -155,14 +159,14 @@ export class Collection<
 
   async updateOne(
     data: Partial<T>,
-    query: EcOp<Partial<U>>
+    query: QueryType<Partial<U>>
   ): Promise<(Document<U> & U) | null> {
     return this.update(data, query) as Promise<(Document<U> & U) | null>;
   }
 
   async updateMany(
     data: Partial<T>,
-    query: EcOp<Partial<U>>
+    query: QueryType<Partial<U>>
   ): Promise<Array<Document<U> & U> | null> {
     return this.update(data, query, true) as Promise<Array<
       Document<U> & U
@@ -171,74 +175,87 @@ export class Collection<
 
   private async update(
     data: Partial<T>,
-    query: EcOp<Partial<U>>,
+    query: QueryType<Partial<U>>,
     isMany?: boolean
   ): Promise<(Document<U> & U) | Array<Document<U> & U> | null> {
-    const result = await this.selectModel(query);
-    if (result.length === 0) return null;
-
-    if (isMany)
-      result.forEach((el, index) => {
-        if ("__id" in data) delete data.__id;
-        el = { ...el, ...data };
-        result[index] = el;
-      });
-    else {
-      if ("__id" in data) delete data.__id;
-      result[0] = { ...result[0], ...data };
-    }
-
     const collectionDB = await this.loadData();
+    const queryInstance = new Query(query, structuredClone(collectionDB));
+    let result = queryInstance.getData() as CollectionType<U>;
+
+    if (result.length === 0) return null;
+    if (!isMany) result = result.slice(0, 1);
+
+    const updated = [];
+
     for (const index in collectionDB) {
       const document = collectionDB[index];
       const t = result.find((el) => el.__id === document.__id);
-
       if (!t) continue;
-      await this.constrain(t, collectionDB, document.__id);
+      if ("__id" in data) {
+        const { __id, ...rest } = data;
+        data = rest as any;
+      }
 
-      collectionDB[index] = t;
+      await this.constrain(data, collectionDB, document.__id);
+      collectionDB[index] = { ...t, ...data };
+      updated.push(collectionDB[index]);
+      if (result.length === 1) break;
     }
 
     await this.saveData(collectionDB);
     return isMany
-      ? (defineDocument(result, this.pathDB, this._collectionName) as Array<
+      ? (defineDocument(updated, this.pathDB, this._collectionName) as Array<
           Document<U> & U
         >)
       : (defineDocument(
-          result[0],
+          updated[0],
           this.pathDB,
           this._collectionName
         ) as Document<U> & U);
   }
 
-  async deleteOne(query: EcOp<Partial<U>>): Promise<U | null> {
-    return this.delete(query) as Promise<U | null>;
+  async deleteOne(
+    query: QueryType<Partial<U>>
+  ): Promise<(Document<U> & U) | null> {
+    return this.delete(query) as Promise<(Document<U> & U) | null>;
   }
 
-  async deleteMany(query: EcOp<Partial<U>>): Promise<U[] | null> {
-    return this.delete(query, true) as Promise<U[] | null>;
+  async deleteMany(
+    query: QueryType<Partial<U>>
+  ): Promise<Array<Document<U> & U> | null> {
+    return this.delete(query, true) as Promise<Array<Document<U> & U> | null>;
   }
 
   private async delete(
-    query: EcOp<Partial<U>>,
+    query: QueryType<Partial<U>>,
     isMany?: boolean
-  ): Promise<U | U[] | null> {
-    const result = await this.selectModel(query);
+  ): Promise<(Document<U> & U) | Array<Document<U> & U> | null> {
+    const collectionDB = await this.loadData();
+    const queryInstance = new Query(query, structuredClone(collectionDB));
+    const result = queryInstance.getData() as CollectionType<U>;
+
     const resultOfDeleted: U[] = [];
     if (result.length === 0) return null;
-    const collectionDB = await this.loadData();
     for (const key in result) {
       const element = result[key];
       const index = collectionDB.findIndex((el) => el.__id === element.__id);
       resultOfDeleted.push(...collectionDB.splice(index, 1));
       if (!isMany) {
         await this.saveData(collectionDB);
-        return resultOfDeleted[0];
+        return defineDocument(
+          resultOfDeleted[0],
+          this.pathDB,
+          this._collectionName
+        ) as Document<U> & U;
       }
     }
 
     await this.saveData(collectionDB);
-    return resultOfDeleted;
+    return defineDocument(
+      resultOfDeleted,
+      this.pathDB,
+      this._collectionName
+    ) as Array<Document<U> & U>;
   }
 
   private async constrain(
@@ -247,9 +264,11 @@ export class Collection<
     __id?: number
   ) {
     this.metadata.unique?.forEach((key) => {
-      const t = collectionDB.find(
-        (el) => el[key] === data[key] && el.__id !== __id
-      );
+      const t = collectionDB.find((el) => {
+        if (!el[key] && !data[key]) return false;
+        return el[key] === data[key] && el.__id !== __id;
+      });
+
       if (t)
         throw new Error(
           `Connot duplicate '${key as string}' field as unique key`
@@ -271,110 +290,6 @@ export class Collection<
     return collectionDB.length > 0
       ? collectionDB[collectionDB.length - 1].__id
       : 0;
-  }
-
-  private getOp(opt: EcOp<Partial<U>>): EcOpArith {
-    if (opt.or) return "or";
-    return Object.keys(opt).length > 0 ? "and" : "no";
-  }
-
-  private compare(
-    a: U,
-    b: U,
-    obj?: { property?: keyof U; flag?: "asc" | "desc" }
-  ): number {
-    let { property, flag } = obj || { property: "__id", flag: "asc" };
-
-    property = property || "__id";
-
-    if (typeof a[property] === "string") {
-      const a1 = a[property] as string;
-      const b1 = b[property] as string;
-      return flag === "desc" ? b1.localeCompare(a1) : a1.localeCompare(b1);
-    } else if (a[property] instanceof Date) {
-      const a1 = a[property] as Date;
-      const b1 = b[property] as Date;
-      return flag === "desc"
-        ? b1.getTime() - a1.getTime()
-        : a1.getTime() - b1.getTime();
-    } else {
-      const a1 = a[property] as number;
-      const b1 = b[property] as number;
-      return flag === "desc" ? b1 - a1 : a1 - b1;
-    }
-  }
-
-  private selectProperties(
-    result: U[],
-    select: Array<keyof U>
-  ): Pick<U, keyof U>[] {
-    return result.map((el) => {
-      const extractObj = {} as Pick<U, keyof U>;
-      select.forEach((property) => {
-        if (el.hasOwnProperty(property)) extractObj[property] = el[property];
-      });
-      return extractObj;
-    }) as Pick<U, keyof U>[];
-  }
-
-  private adapterField(obj: Partial<U>) {
-    let r: {
-      field: keyof U;
-      value: any;
-    }[] = [];
-
-    Object.keys(obj).forEach((key) => {
-      r.push({
-        field: key as keyof U,
-        value: obj[key as keyof Partial<U>],
-      });
-    });
-    return r;
-  }
-
-  private async andOp(opt: EcOp<Partial<U>>): Promise<U[]> {
-    const ops = Object.keys(opt);
-    let collectionDB = await this.loadData();
-
-    ["eq", "not", "lt", "gt", "lte", "gte"].forEach((op) => {
-      if (ops.includes(op)) {
-        const opValue = this.adapterField(
-          opt[op as keyof EcOp<U>] as Partial<U>
-        );
-
-        opValue.forEach((el) => {
-          collectionDB = collectionDB.filter((e) => {
-            if (op === "eq") return e[el.field] === el.value;
-            if (op === "not") return e[el.field] !== el.value;
-            if (op === "lt") return e[el.field] < el.value;
-            if (op === "gt") return e[el.field] > el.value;
-            if (op === "lte") return e[el.field] <= el.value;
-            if (op === "gte") return e[el.field] >= el.value;
-          });
-        });
-      }
-    });
-    return collectionDB as U[];
-  }
-
-  private async orOp(opt: EcOp<Partial<U>>): Promise<U[]> {
-    if (opt.or!.length < 1) return [];
-
-    const andOp1 = opt.or![0];
-    const result: U[] = await this.andOp(andOp1);
-
-    const andOpAll = opt.or?.slice(1);
-    const resultAll: U[] = [];
-
-    for (const andOp of andOpAll!) {
-      resultAll.push(...(await this.andOp(andOp)));
-    }
-
-    resultAll.forEach((el) => {
-      if (!result.includes(el)) result.push(el);
-    });
-
-    return result as U[];
   }
 
   /**
@@ -463,10 +378,13 @@ export class Collection<
   }
 
   /**
-   * Count documents in this collection.
+   * Counts documents in this collection.
    */
-  async count() {
-    return (await this.loadData()).length;
+  async count(query?: QueryType<Partial<U>>) {
+    if (!query) return (await this.loadData()).length;
+
+    const data = await this.findMany(query);
+    return data.length;
   }
 
   private async loadData(load: boolean = true): Promise<CollectionType<U>> {
@@ -477,7 +395,7 @@ export class Collection<
     return db[this._collectionName] as CollectionType<U>;
   }
 
-  private loadDataLocally(db: EcDbType) {
+  private loadDataLocally(db: DataBaseType) {
     this.metadata =
       ((db["__metadata__"] as Array<MetadataType<{}>>).find(
         (collection) => collection.collectionName === this._collectionName

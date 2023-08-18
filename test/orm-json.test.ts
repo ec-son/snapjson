@@ -1,16 +1,19 @@
 import { Collection } from "../src/lib/collection";
-import { OrmJson, createCollection } from "../src/lib/orm-json";
-import { EcDbType, MetadataType } from "../src/type/ec_type";
+import {
+  OrmJson,
+  createCollection,
+  removeCollection,
+} from "../src/lib/orm-json";
+import { DataBaseType, MetadataType } from "../src/type/orm.type";
 import * as utilsFun from "../src/utils/utils.func";
 import { convertToObject } from "../src/utils/utils.func";
 
 const mockLoadData = jest.spyOn(utilsFun, "loadData");
 const mockSaveData = jest.spyOn(utilsFun, "saveData");
-// const mockIsExistFile = jest.spyOn(utilsFun, "isExistFile");
 
 const path_db = "path/db.json";
 const orm = new OrmJson(path_db);
-const db: EcDbType = {
+const db: DataBaseType = {
   user: [
     {
       fullname: "john smith",
@@ -41,8 +44,10 @@ mockSaveData.mockResolvedValue(void 0);
  * pathDB
  *
  * createCollection
+ * createCollection helper
  * createCollections
  * removeCollection
+ * removeCollection helper
  * collection
  * size
  */
@@ -58,16 +63,6 @@ describe("data base", () => {
   it("should return false if collection doesn't exist", async () => {
     await expect(orm.isExistCollection("student")).resolves.toBeFalsy();
   });
-
-  // it("should return true is database file exists", async () => {
-  //   mockIsExistFile.mockResolvedValue(true);
-  //   await expect(orm.testDatabase()).resolves.toBeTruthy();
-  // });
-
-  // it("should return false is database file doesn't exist", async () => {
-  //   mockIsExistFile.mockResolvedValue(false);
-  //   await expect(orm.testDatabase("db.json")).resolves.toBeFalsy();
-  // });
 
   it("should return path of database", () => {
     const path = "root/db.json";
@@ -203,7 +198,7 @@ describe("Collection", () => {
       metadata: { collectionName: "user", unique: [] },
     },
     {
-      collections: { name: "student", unique: ["email"] },
+      collections: { collectionName: "student", unique: ["email"] },
       expected: "student",
       metadata: { collectionName: "student", unique: [] },
     },
@@ -219,10 +214,10 @@ describe("Collection", () => {
     { collections: [], expected: [] },
     {
       collections: [
-        { name: "student", uniqueKeys: ["email", "name"] },
-        { name: "student", uniqueKeys: ["email", "name"] },
-        { name: "teacher", uniqueKeys: ["email"] },
-        { name: "patient" },
+        { collectionName: "student", uniqueKeys: ["email", "name"] },
+        { collectionName: "student", uniqueKeys: ["email", "name"] },
+        { collectionName: "teacher", uniqueKeys: ["email"] },
+        { collectionName: "patient" },
       ],
       metadata: [
         { collectionName: "student", unique: ["email", "name"] },
@@ -285,7 +280,6 @@ describe("Collection", () => {
     }
   );
 
-  const table5 = ["user", ["user", "student", "teacher"]];
   it.each(table2)(
     "should return undefined when removing collection from database which has no collection",
     async (collection) => {
@@ -310,10 +304,10 @@ describe("Collection", () => {
 });
 
 /**
- * COLLECTION INSTANCE
+ * MANAGEMENT COLLECTION WITH HELPER FUNCTION
  */
 
-describe("creation collection", () => {
+describe("management collection with helper function", () => {
   it("should return a created collection", async () => {
     await expect(createCollection("collection1")).resolves.toBe("collection1");
   });
@@ -327,5 +321,26 @@ describe("creation collection", () => {
   it("should create a new collection instance", async () => {
     mockLoadData.mockResolvedValue(db);
     await expect(orm.collection("user")).resolves.toBeInstanceOf(Collection);
+  });
+
+  const table1 = ["collection", ["collection1", "collection2"]];
+  it.each(table1)("should return a deleted collection", async (opt) => {
+    let collection = opt;
+    const expected = structuredClone(opt);
+    if (!Array.isArray(collection)) collection = [opt] as any;
+    const _col = {} as any;
+    (collection as Array<string>).forEach((element) => {
+      _col[element] = [];
+    });
+    const _db: DataBaseType = {
+      ..._col,
+      __metadata__: (collection as Array<string>).map((collectionName) => ({
+        collectionName,
+        unique: [],
+      })),
+    };
+
+    mockLoadData.mockResolvedValueOnce(_db);
+    await expect(removeCollection(opt)).resolves.toEqual(expected);
   });
 });

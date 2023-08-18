@@ -38,19 +38,13 @@ describe("creating document", () => {
 
   it("should save document", async () => {
     user.age = 20;
-    const expected = user.toObject();
-    delete expected.__id;
+    const { __id, ...expected } = user.toObject();
     await user.save();
-    expect(mockUpdateOne).toHaveBeenNthCalledWith(1, expected, {
-      eq: { __id: 5 },
-    });
+    expect(mockUpdateOne).toHaveBeenNthCalledWith(1, { age: 20 }, { __id: 5 });
   });
 
   it("should delete document", async () => {
-    const expected = user.toObject();
     await user.delete();
-    expect(mockDeleteOne).toHaveBeenNthCalledWith(1, {
-      eq: { __id: 5 },
-    });
+    expect(mockDeleteOne).toHaveBeenNthCalledWith(1, { __id: 5 });
   });
 });

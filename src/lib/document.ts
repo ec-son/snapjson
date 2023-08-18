@@ -1,3 +1,4 @@
+import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
 import { defineCollection } from "./orm-json";
 
@@ -16,7 +17,7 @@ export class Document<T extends Object> {
   ];
 
   constructor(
-    private document: T | Partial<T>,
+    private document: T,
     private path_id: string,
     private collectionName: string
   ) {
@@ -26,7 +27,8 @@ export class Document<T extends Object> {
 
     if ((document as { __id?: number }).__id) {
       this.id = (document as { __id?: number }).__id!;
-      delete (document as { __id?: number }).__id;
+      const { __id, ...rest } = document as any;
+      document = rest;
     }
   }
 
@@ -34,8 +36,8 @@ export class Document<T extends Object> {
    * Convert this document into JavaScript object.
    * @returns Converted document.
    */
-  toObject(): T | Partial<T> {
-    const document = this.document;
+  toObject(): T {
+    const document = structuredClone(this.document);
 
     for (const key of Object.keys(this)) {
       if (this.hasOwnProperty(key) && !this.privateProps.includes(key)) {
@@ -69,16 +71,22 @@ export class Document<T extends Object> {
    */
   async save() {
     await this.init();
-    const document = this.toObject();
+    let document = this.toObject();
 
-    if ((document as { __id?: number }).__id) {
-      delete (document as { __id?: number }).__id;
+    let data: T = {} as T;
+    (Object.keys(this.document) as Array<keyof T>).forEach((key) => {
+      if (!isEqual(this.document[key], document[key]))
+        data[key] = document[key];
+    });
+
+    if ((data as { __id?: number }).__id) {
+      const { __id, ...rest } = data as any;
+      data = rest;
     }
 
     return (
-      (await this.collection?.updateOne(document, {
-        eq: { __id: this.id } as Partial<{ __id: number } & T>,
-      })) !== null
+      (await this.collection?.updateOne(data, { __id: this.id } as any)) !==
+      null
     );
   }
 
@@ -89,9 +97,7 @@ export class Document<T extends Object> {
   async delete() {
     await this.init();
     return (
-      (await this.collection?.deleteOne({
-        eq: { __id: this.id } as Partial<{ __id: number } & T>,
-      })) !== null
+      (await this.collection?.deleteOne({ __id: this.id } as any)) !== null
     );
   }
 }

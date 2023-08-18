@@ -1,7 +1,8 @@
-import { EcDbType, MetadataType, EcOp } from "../src/type/ec_type";
+// import { EcDbType, MetadataType, EcOp } from "../src/type/ec_type";
 import * as utilsFun from "../src/utils/utils.func";
 import { Collection } from "../src/lib/collection";
 import { OrmJson, defineCollection } from "../src/lib/orm-json";
+import { DataBaseType, MetadataType, QueryType } from "../src/type/orm.type";
 
 const mockLoadData = jest.spyOn(utilsFun, "loadData");
 const mockSaveData = jest.spyOn(utilsFun, "saveData");
@@ -23,14 +24,14 @@ interface userType {
   age?: number;
 }
 
-interface queryType extends EcOp<Partial<userType>> {
+interface queryType extends QueryType<Partial<userType>> {
   id?: number | number[];
 }
 
 const path_db = "path/db.json";
 const orm = new OrmJson(path_db);
 let user: Collection<Pick<userType, Exclude<keyof userType, "__id">>>;
-const db: EcDbType = {
+const db: DataBaseType = {
   user: [
     {
       __id: 1,
@@ -86,7 +87,7 @@ mockSaveData.mockResolvedValue(void 0);
  * add
  * create
  * inserOne
- * inserMany
+ * insertMany
  *
  * updateOne
  * updateMany
@@ -163,24 +164,27 @@ describe("selecting documents from database", () => {
 
   it("should not return an object with firstName property", async () => {
     await expect(
-      user.findOne({ eq: { __id: 1 } }, { select: ["__id"] })
+      user.findOne({ __id: 1 }, { select: ["__id"] })
     ).resolves.not.toHaveProperty("firstName", 1);
   });
 
   const table1: queryType[] = [
-    { eq: { __id: 1, firstName: "John", email: "john@example.com" }, id: 1 },
-    { gt: { __id: 1 }, id: 2 },
-    { gte: { __id: 2 }, id: 2 },
-    { lt: { __id: 5 }, id: 1 },
-    { lte: { __id: 5 }, id: 1 },
-    { gt: { __id: 1 }, lt: { __id: 5 }, id: 2 },
-    { not: { email: "john@example.com" }, id: 2 },
-    { or: [{ eq: { age: 18 } }, { eq: { age: 25 } }], id: 2 },
+    { __id: 1, firstName: "John", email: "john@example.com", id: 1 },
+    { __id: { $gt: 1 }, id: 2 },
+    { __id: { $gte: 2 }, id: 2 },
+    { __id: { $lt: 5 }, id: 1 },
+    { __id: { $lte: 5 }, id: 1 },
+    { __id: { $gt: 1, $lt: 5 }, id: 2 },
+    { email: { $ne: "john@example.com" }, id: 2 },
+    { email: /ly@ex/, id: 4 },
+    { $and: [{ age: 21 }, { email: { $eq: /tty/ } }], id: 5 },
+    { $or: [{ age: 18 }, { age: 25 }], id: 2 },
   ];
 
-  it.each(table1)("should return the correct document", async (query) => {
+  it.each(table1)("should return the correct document", async (opts) => {
+    const { id, ...query } = opts;
     const expected = structuredClone(
-      (db["user"] as Array<userType>).find((el) => el.__id === query.id)
+      (db["user"] as Array<userType>).find((el) => el.__id === id)
     );
     await expect(user.findOne(query)).resolves.toEqual(
       factoryDocument(expected!)
@@ -188,13 +192,13 @@ describe("selecting documents from database", () => {
   });
 
   const table2: queryType[] = [
-    { eq: { age: 21 }, id: [1, 5] },
-    { gte: { age: 15 }, lt: { age: 20 }, id: [2, 4] },
+    { age: 21, id: [1, 5] },
+    { age: { $gte: 15, $lt: 20 }, id: [2, 4] },
     {
-      or: [
-        { gt: { age: 21 } },
-        { lte: { age: 15 } },
-        { eq: { firstName: "Betty" } },
+      $or: [
+        { age: { $gt: 21 } },
+        { age: { $lte: 15 } },
+        { firstName: { $eq: "Betty" } },
       ],
       id: [3, 4, 5],
     },
@@ -202,9 +206,10 @@ describe("selecting documents from database", () => {
 
   it.each(table2)(
     "should return an array of entities that match the given query",
-    async (query) => {
+    async (opts) => {
+      const { id, ...query } = opts;
       const expected = (db["user"] as Array<userType>).filter((el) => {
-        return (query.id as Array<number>).includes(el.__id);
+        return (id as Array<number>).includes(el.__id);
       });
 
       await expect(user.findMany(query)).resolves.toEqual(
@@ -215,18 +220,16 @@ describe("selecting documents from database", () => {
 
   it("should return an sorted array of documents", async () => {
     const expected = [
-      { __id: 5 },
-      { __id: 4 },
-      { __id: 3 },
-      { __id: 2 },
-      { __id: 1 },
+      { age: 25 },
+      { age: 21 },
+      { age: 21 },
+      { age: 18 },
+      { age: 15 },
     ];
     await expect(
       user.findMany(
-        {
-          or: [{ eq: { age: 25 } }, { lte: { age: 20 } }, { eq: { age: 21 } }],
-        },
-        { select: ["__id"], sort: { flag: "desc" } }
+        { $or: [{ age: { $in: [25, 21] } }, { age: { $lte: 20 } }] },
+        { select: ["age"], sort: { flag: "desc", entity: "age" } }
       )
     ).resolves.toEqual(factoryDocument(expected));
   });
@@ -272,7 +275,7 @@ describe("inserting documents into database", () => {
       { firstName: "item6", email: "item6@example.com", age: 36 },
       { firstName: "item7", email: "item7@example.com" },
     ];
-    await expect(user.inserMany(items)).resolves.toContainEqual(
+    await expect(user.insertMany(items)).resolves.toContainEqual(
       factoryDocument({ ...items[1], __id: 7 })
     );
   });
@@ -289,7 +292,7 @@ describe("inserting documents into database", () => {
       return { ...el, __id };
     });
 
-    await user.inserMany(items);
+    await user.insertMany(items);
     expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual(expected[1]);
   });
 });
@@ -300,13 +303,14 @@ describe("inserting documents into database", () => {
 
 describe("updating entities from database", () => {
   const table1: queryType[] = [
-    { eq: { __id: 1, firstName: "John", email: "john@example.com" }, id: 1 },
-    { not: { email: "john@example.com" }, id: 2 },
+    { __id: 1, firstName: "John", email: "john@example.com", id: 1 },
+    { email: { $ne: "john@example.com" }, id: 2 },
   ];
 
-  it.each(table1)("should return updated entity", async (query) => {
+  it.each(table1)("should return updated entity", async (opts) => {
+    const { id, ...query } = opts;
     const expected = structuredClone(
-      (db["user"] as Array<userType>).find((el) => el.__id === query.id)
+      (db["user"] as Array<userType>).find((el) => el.__id === id)
     );
 
     expected!.age = 30;
@@ -323,13 +327,13 @@ describe("updating entities from database", () => {
       age: 35,
     };
 
-    await user.updateOne({ age: 35 }, { eq: { __id: 4 } });
+    await user.updateOne({ age: 35 }, { __id: 4 });
     expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual(expected);
   });
 
   it("should throw an error when update, constrain", async () => {
     await expect(
-      user.updateOne({ email: "rick@example.com" }, { eq: { __id: 1 } })
+      user.updateOne({ email: "rick@example.com" }, { __id: 1 })
     ).rejects.toThrow();
   });
 
@@ -346,10 +350,7 @@ describe("updating entities from database", () => {
     ];
 
     await expect(
-      user.updateMany(
-        { age },
-        { or: [{ eq: { age: 25 } }, { eq: { age: 15 } }] }
-      )
+      user.updateMany({ age }, { age: { $in: [25, 15] } })
     ).resolves.toEqual(factoryDocument(expected));
   });
 
@@ -365,10 +366,7 @@ describe("updating entities from database", () => {
       },
     ];
 
-    await user.updateMany(
-      { age },
-      { or: [{ eq: { age: 25 } }, { eq: { age: 15 } }] }
-    );
+    await user.updateMany({ age }, { age: { $in: [25, 15] } });
     expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual(expected[1]);
   });
 });
@@ -379,15 +377,21 @@ describe("updating entities from database", () => {
 
 describe("deleting entities from database", () => {
   const table1: queryType[] = [
-    { eq: { __id: 1, firstName: "John", email: "john@example.com" }, id: 1 },
-    { not: { email: "john@example.com" }, id: 2 },
+    { __id: 1, firstName: "John", email: "john@example.com", id: 1 },
+    { email: { $ne: "john@example.com" }, id: 2 },
   ];
 
-  it.each(table1)("should return deleted  entity", async (query) => {
-    const expected = structuredClone(
-      (db["user"] as Array<userType>).find((el) => el.__id === query.id)
+  it.each(table1)("should return deleted  entity", async (opts) => {
+    const { id, ...query } = opts;
+    let expected = structuredClone(
+      (db["user"] as Array<userType>).find((el) => el.__id === id)
     );
 
+    expected = utilsFun.defineDocument(
+      expected as queryType,
+      path_db,
+      "user"
+    ) as any;
     await expect(user.deleteOne(query)).resolves.toEqual(expected);
   });
 
@@ -398,18 +402,18 @@ describe("deleting entities from database", () => {
       email: "crowly@example.com",
       firstName: "Crowly",
     };
-    await user.deleteOne({ eq: { __id: 4 } });
+    await user.deleteOne({ __id: 4 });
     expect(mockSaveData.mock.calls[0][1]["user"]).not.toContainEqual(expected);
   });
 
   it("should return deleted entities", async () => {
-    const expected = [
+    let expected = [
       { __id: 1, age: 21, email: "john@example.com", firstName: "John" },
       { __id: 5, age: 21, email: "betty@example.com", firstName: "Betty" },
     ];
-    await expect(user.deleteMany({ eq: { age: 21 } })).resolves.toEqual(
-      expected
-    );
+
+    expected = utilsFun.defineDocument(expected, path_db, "user") as any;
+    await expect(user.deleteMany({ age: 21 })).resolves.toEqual(expected);
   });
 
   it("should delete entities from database", async () => {
@@ -420,7 +424,7 @@ describe("deleting entities from database", () => {
       age: 21,
     };
 
-    await user.deleteMany({ eq: { age: 21 } });
+    await user.deleteMany({ age: 21 });
     expect(mockSaveData.mock.calls[0][1]["user"]).not.toContainEqual(expected);
   });
 });

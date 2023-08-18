@@ -10,6 +10,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
+    "dev1": "tsnd  --respawn dev/index.ts",
     "test": "jest --watch"
   },
   "keywords": [
@@ -28,9 +29,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ec-son/orm-json.git",
-    "directory": "packages/jest"
+    "url": "https://github.com/ec-son/orm-json.git"
   },
+  "bugs": {
+    "url": "https://github.com/ec-son/orm-json/issues"
+  },
+  "homepage": "https://github.com/ec-son/orm-json/tree/feature/entity#readme",
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.8",
