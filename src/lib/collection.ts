@@ -73,9 +73,9 @@ export class Collection<
     } as QueryOptionType<any>) as Promise<(Document<any> & any) | undefined>;
   }
 
-  async findMany(query: QueryType<Partial<U>>): Promise<Array<Document<U> & U>>;
+  async find(query: QueryType<Partial<U>>): Promise<Array<Document<U> & U>>;
 
-  async findMany<
+  async find<
     X extends Array<keyof U> | undefined = undefined,
     Y extends Object = X extends Array<keyof U>
       ? { [K in X[number]]: K extends keyof U ? U[K] : never }
@@ -85,7 +85,7 @@ export class Collection<
     opts: X extends undefined ? QueryOptionType<U> : QueryOptionType<U, X>
   ): Promise<Array<Document<Y> & Y>>;
 
-  async findMany(
+  async find(
     query: QueryType<Partial<U>>,
     opts?: any
   ): Promise<Array<Document<any> & any>> {
@@ -383,7 +383,7 @@ export class Collection<
   async count(query?: QueryType<Partial<U>>) {
     if (!query) return (await this.loadData()).length;
 
-    const data = await this.findMany(query);
+    const data = await this.find(query);
     return data.length;
   }
 

@@ -1,7 +1,7 @@
 {
   "name": "orm-json",
   "version": "1.0.0",
-  "description": "",
+  "description": "A simple ORM for Node.js using JSON file",
   "author": {
     "name": "Amissi Ec-son",
     "email": "useniecson@gmail.com"
@@ -34,7 +34,7 @@
   "bugs": {
     "url": "https://github.com/ec-son/orm-json/issues"
   },
-  "homepage": "https://github.com/ec-son/orm-json/tree/feature/entity#readme",
+  "homepage": "https://github.com/ec-son/orm-json/blob/develop/README.md",
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.8",

@@ -172,13 +172,13 @@ export class OrmJson {
    *
    * @example
    * // Suppose we have a database containing user collection
-   * // Here's how to use the isExistCollection method to check if the user collection exists in the database.
+   * // Here's how to use the isExistCollection method to check if the user collection exists.
    * const orm = new OrmJson();
    * const userExists = await orm.isExistCollection("user");
    * if (userExists) {
-   *    console.log("The user collection exists in the database.");
+   *    console.log("The user collection exists.");
    * } else {
-   *    console.log("The user collection does not exist in the database.");
+   *    console.log("The user collection does not exist.");
    * }
    */
   async isExistCollection(collection: string): Promise<boolean> {
@@ -189,15 +189,6 @@ export class OrmJson {
   /**
    * DATA BASE
    */
-
-  /**
-   * Check if the database file exists.
-   * @param {string} path_db Path of database file. If not provided, it use the internal path.
-   * @returns Returns true if the database file exists, false otherwise.
-   */
-  // testDatabase(path_db?: string): Promise<boolean> {
-  //   return isExistFile(path_db || this._pathDB);
-  // }
 
   /**
    * Returns size of the database
@@ -281,14 +272,6 @@ export async function createCollection(
     return orm.createCollections(collections, force);
   return orm.createCollection(collections, force);
 }
-
-/**
- *
- * @param collections
- * @param path
- * @param force
- * @returns
- */
 
 /**
  * Remove one or many collections.

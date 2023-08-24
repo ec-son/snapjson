@@ -82,7 +82,7 @@ mockSaveData.mockResolvedValue(void 0);
  *
  * findById
  * findOne
- * findMany
+ * find
  *
  * add
  * create
@@ -212,7 +212,7 @@ describe("selecting documents from database", () => {
         return (id as Array<number>).includes(el.__id);
       });
 
-      await expect(user.findMany(query)).resolves.toEqual(
+      await expect(user.find(query)).resolves.toEqual(
         factoryDocument(expected)
       );
     }
@@ -227,7 +227,7 @@ describe("selecting documents from database", () => {
       { age: 15 },
     ];
     await expect(
-      user.findMany(
+      user.find(
         { $or: [{ age: { $in: [25, 21] } }, { age: { $lte: 20 } }] },
         { select: ["age"], sort: { flag: "desc", entity: "age" } }
       )
