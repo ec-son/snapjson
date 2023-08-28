@@ -1,1 +1,1 @@
-export * from "./lib/orm-json";
+export * from "./lib/snapjson";

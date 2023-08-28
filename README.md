@@ -1,13 +1,17 @@
-# orm-json
+# snapjson
 
-> **orm-json** is a lightweight NoSQL object-relational mapping (ORM) library for Node.js, written in TypeScript. It allows you to store data in JSON files, with each collection represented as an array of documents.
+![Build Status](https://img.shields.io/badge/build-passing-4cc61e)
+[![npm version](https://badgen.net/npm/v/snapjson)](https://www.npmjs.com/package/snapjson)
+![Size](https://img.shields.io/bundlejs/size/snapjson)
+
+> **snapjson** is a lightweight NoSQL object-relational mapping (ORM) library for Node.js, written in TypeScript. It allows you to store data in JSON files, with each collection represented as an array of documents.
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Getting Started](#getting-started)
-  - [Importing of `OrmJson` class](#importing-the-ormjson-class)
-  - [ Creating an instance of `OrmJson`](#creating-an-instance-of-ormjson)
+  - [Importing of `SnapJson` class](#importing-the-snapjson-class)
+  - [ Creating an instance of `SnapJson`](#creating-an-instance-of-snapjson)
   - [Defining the data schema](#defining-the-data-schema)
   - [Creating a collection](#creating-a-collection)
   - [Removing a collection](#removing-a-collection)
@@ -18,8 +22,8 @@
     - [Deleting documents](#deleting-documents)
   - [Document methods](#document-methods)
   - [Additional methods](#additional-methods)
-    - [OrmJson](#ormjson)
-    - [Collection](#collection)
+    - [SnapJson class](#snapjson-class)
+    - [Collection class](#collection-class)
 - [Operators](#operators)
   - [Comparison Operators](#comparison-operators)
     - [$eq Operator](#eq-operator)
@@ -45,24 +49,24 @@
 ## Installation
 
 ```bash
-npm install orm-json
+npm install snapjson
 ```
 
 ## Getting Started
 
-To use the orm-json module, follow these simple steps:
+To use the snapjson module, follow these simple steps:
 
-### Importing the `OrmJson` class
+### Importing the `SnapJson` class
 
 ```typescript
-import { OrmJson, createCollection } from "orm-json";
+import { SnapJson, createCollection } from "snapjson";
 ```
 
-### Creating an instance of `OrmJson`
+### Creating an instance of `SnapJson`
 
 ```typescript
 const path = ""; // path of JSON file
-const orm = new OrmJson(path);
+const orm = new SnapJson(path);
 ```
 
 ### Defining the data schema
@@ -99,7 +103,7 @@ const collection = await orm.createCollection({
 Alternatively, you can use a shortcut helper function:
 
 ```typescript
-// Instead of orm.createCollection and orm.createCollections, you can use: createCollection function, imported from orm-json.
+// Instead of orm.createCollection and orm.createCollections, you can use: createCollection function, imported from snapjson.
 // createCollection<T>(collection: string | { collectionName: string; uniqueKeys?: Array<keyof T>; }, path?: string, force?: boolean), default path is db/db.json
 const collection = await createCollection("user");
 const collections = await createCollection(["user", "teacher"]);
@@ -289,7 +293,7 @@ if (user) {
 
 ### Additional methods
 
-#### OrmJson
+#### SnapJson class
 
 ```typescript
 /*
@@ -311,7 +315,7 @@ console.log(databaseSize); // 58 KB
 console.log(orm.pathDB); // db/db.json
 ```
 
-#### Collection
+#### Collection class
 
 ```typescript
 /*
@@ -365,9 +369,9 @@ console.log(id); // 3
 
 ## Operators
 
-Operators are special symbols or keywords that allow you to carry out mathematical or logical operations. orm-json provides a large number of operators to help you build complex queries.
+Operators are special symbols or keywords that allow you to carry out mathematical or logical operations. snapjson provides a large number of operators to help you build complex queries.
 
-orm-json offers the following query operator types:
+snapjson offers the following query operator types:
 
 - Comparison
 - Logical
@@ -375,7 +379,7 @@ orm-json offers the following query operator types:
 
 ## Comparison Operators
 
-orm-json comparison operators can be used to compare values in a document. The following table contains the common comparison operators.
+snapjson comparison operators can be used to compare values in a document. The following table contains the common comparison operators.
 
 | Operators | Description                                                     |
 | --------- | --------------------------------------------------------------- |
@@ -648,7 +652,7 @@ await studentsCollection.find({ age: { $nin: [20, 30, 40] } });
 
 Logical operators are used to filter data based on given conditions. They provide a way to combine multiple conditions.
 
-orm-json provides two logical operators: $or and $and.
+snapjson provides two logical operators: $or and $and.
 
 | Operator | Description                                                                                           |
 | -------- | ----------------------------------------------------------------------------------------------------- |
@@ -737,8 +741,8 @@ await studentsCollection.find({
 
 ## Array Operators
 
-orm-json provides several operators for searching arrays.
-Here are the array operators provided by orm-json.
+snapjson provides several operators for searching arrays.
+Here are the array operators provided by snapjson.
 
 | Operator    | Description                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------ |
@@ -879,7 +883,7 @@ await shoesCollection.find({ colors: { $nocontains: "white" } });
 
 # Working with Regular Expressions
 
-orm-json supports regular expressions for string-based queries. You can use regular expressions with various operators to search for patterns within string.
+snapjson supports regular expressions for string-based queries. You can use regular expressions with various operators to search for patterns within string.
 
 ```typescript
 await studentsCollection.find({ email: /.com$/ });
@@ -926,10 +930,10 @@ await shoesCollection.find({ colors: { $contains: [/re/, "cyan"] } });
 
 ## Reporting Issues
 
-If you encounter any issues, have questions, or want to contribute to the project, please visit the [GitHub repository](https://github.com/ec-son/orm-json/issues) and open an issue.
+If you encounter any issues, have questions, or want to contribute to the project, please visit the [GitHub repository](https://github.com/ec-son/snapjson/issues) and open an issue.
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/ec-son/orm-json/blob/main/README.md).
+This project is licensed under the [MIT License](https://github.com/ec-son/snapjson/blob/main/LICENSE).
 
 ---

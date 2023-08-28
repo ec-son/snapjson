@@ -1,6 +1,6 @@
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
-import { defineCollection } from "./orm-json";
+import { defineCollection } from "./snapjson";
 
 export class Document<T extends Object> {
   private id: number = -1;

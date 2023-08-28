@@ -1,13 +1,16 @@
 {
-  "name": "orm-json",
-  "version": "1.0.0",
+  "name": "snapjson",
+  "version": "1.0.1",
   "description": "A simple ORM for Node.js using JSON file",
   "author": {
     "name": "Amissi Ec-son",
     "email": "useniecson@gmail.com"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
     "test": "jest --watch"
@@ -18,7 +21,9 @@
     "db",
     "orm",
     "json",
-    "NoSQL"
+    "NoSQL",
+    "snapjson",
+    "snap"
   ],
   "files": [
     "dist/",
@@ -28,12 +33,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ec-son/orm-json.git"
+    "url": "https://github.com/ec-son/snapjson.git"
   },
   "bugs": {
-    "url": "https://github.com/ec-son/orm-json/issues"
+    "url": "https://github.com/ec-son/snapjson/issues"
   },
-  "homepage": "https://github.com/ec-son/orm-json/blob/main/README.md",
+  "homepage": "https://github.com/ec-son/snapjson",
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.8",

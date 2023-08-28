@@ -1,5 +1,5 @@
 import { Document } from "../src/lib/document";
-import * as createCollection from "../src/lib/orm-json";
+import * as createCollection from "../src/lib/snapjson";
 
 /**
  * toObject

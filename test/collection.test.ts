@@ -1,6 +1,6 @@
 import * as utilsFun from "../src/utils/utils.func";
 import { Collection } from "../src/lib/collection";
-import { OrmJson, defineCollection } from "../src/lib/orm-json";
+import { SnapJson, defineCollection } from "../src/lib/snapjson";
 import { DataBaseType, MetadataType, QueryType } from "../src/type/orm.type";
 
 const mockLoadData = jest.spyOn(utilsFun, "loadData");
@@ -27,7 +27,7 @@ interface queryType extends QueryType<Partial<userType>> {
 }
 
 const path_db = "path/db.json";
-const orm = new OrmJson(path_db);
+const orm = new SnapJson(path_db);
 let user: Collection<Pick<userType, Exclude<keyof userType, "__id">>>;
 const db: DataBaseType = {
   user: [

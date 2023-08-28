@@ -1,9 +1,9 @@
 import { Collection } from "../src/lib/collection";
 import {
-  OrmJson,
+  SnapJson,
   createCollection,
   removeCollection,
-} from "../src/lib/orm-json";
+} from "../src/lib/snapjson";
 import { DataBaseType, MetadataType } from "../src/type/orm.type";
 import * as utilsFun from "../src/utils/utils.func";
 import { convertToObject } from "../src/utils/utils.func";
@@ -12,7 +12,7 @@ const mockLoadData = jest.spyOn(utilsFun, "loadData");
 const mockSaveData = jest.spyOn(utilsFun, "saveData");
 
 const path_db = "path/db.json";
-const orm = new OrmJson(path_db);
+const orm = new SnapJson(path_db);
 const db: DataBaseType = {
   user: [
     {
@@ -66,7 +66,7 @@ describe("data base", () => {
 
   it("should return path of database", () => {
     const path = "root/db.json";
-    const _orm = new OrmJson(path);
+    const _orm = new SnapJson(path);
     expect(_orm.pathDB).toEqual(path);
   });
 

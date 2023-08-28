@@ -2,7 +2,7 @@ import { Collection } from "./collection";
 import { loadData, saveData, sizeFile } from "../utils/utils.func";
 import { DataBaseType, MetadataType } from "../type/orm.type";
 
-export class OrmJson {
+export class SnapJson {
   private _pathDB: string;
   private _collection: string[] = [];
   private metadata: Array<MetadataType<Record<string, any>>> = [];
@@ -173,7 +173,7 @@ export class OrmJson {
    * @example
    * // Suppose we have a database containing user collection
    * // Here's how to use the isExistCollection method to check if the user collection exists.
-   * const orm = new OrmJson();
+   * const orm = new SnapJson();
    * const userExists = await orm.isExistCollection("user");
    * if (userExists) {
    *    console.log("The user collection exists.");
@@ -220,7 +220,7 @@ export class OrmJson {
   }
 
   private async saveData(data: DataBaseType) {
-    saveData(this._pathDB, data);
+    await saveData(this._pathDB, data);
   }
 }
 
@@ -235,7 +235,7 @@ export async function defineCollection<T extends Object>(
   collectionName: string,
   path?: string
 ): Promise<Collection<T>> {
-  const orm = new OrmJson(path);
+  const orm = new SnapJson(path);
   return orm.collection(collectionName);
 }
 
@@ -267,7 +267,7 @@ export async function createCollection(
   path?: string,
   force?: boolean
 ): Promise<string | string[]> {
-  const orm = new OrmJson(path);
+  const orm = new SnapJson(path);
   if (Array.isArray(collections))
     return orm.createCollections(collections, force);
   return orm.createCollection(collections, force);
@@ -285,6 +285,6 @@ export async function removeCollection(
   path?: string,
   force: boolean = false
 ): Promise<typeof collections | undefined> {
-  const orm = new OrmJson(path);
+  const orm = new SnapJson(path);
   return orm.removeCollection(collections, force);
 }
