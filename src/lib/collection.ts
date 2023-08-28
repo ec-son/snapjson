@@ -277,7 +277,7 @@ export class Collection<
   }
 
   /**
-   * Get the last id inserted. If no document found, it returns 0
+   * Returns the last id inserted. If no document found, it returns 0
    */
   async lastIdInsert(): Promise<number> {
     return this._lastIdInsert();
@@ -293,7 +293,7 @@ export class Collection<
   }
 
   /**
-   * Add unique key.
+   * Adds unique key.
    * @param keyName Name of unique key.
    * @returns Returns the unique key.
    */
@@ -315,7 +315,7 @@ export class Collection<
   }
 
   /**
-   * Remove unique key.
+   * Removes unique key.
    * @param uniqueKey Name of unique key.
    * @returns Returns the unique key.
    */
@@ -338,7 +338,7 @@ export class Collection<
   }
 
   /**
-   * Remove all unique keys
+   * Removes all unique keys
    */
   async removeAllUniqueKeys(): Promise<Array<keyof T>> {
     await this.loadData();
@@ -349,7 +349,7 @@ export class Collection<
   }
 
   /**
-   * Get all unique keys.
+   * Returns all unique keys.
    */
   async getUniqueKeys(): Promise<Array<keyof T>> {
     await this.loadData();
@@ -369,7 +369,7 @@ export class Collection<
    */
 
   /**
-   * Return size of this collection.
+   * Returns size of this collection.
    */
   async size(): Promise<string> {
     const collectionString = JSON.stringify(await this.loadData());

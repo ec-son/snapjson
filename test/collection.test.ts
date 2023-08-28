@@ -1,4 +1,3 @@
-// import { EcDbType, MetadataType, EcOp } from "../src/type/ec_type";
 import * as utilsFun from "../src/utils/utils.func";
 import { Collection } from "../src/lib/collection";
 import { OrmJson, defineCollection } from "../src/lib/orm-json";
@@ -6,7 +5,6 @@ import { DataBaseType, MetadataType, QueryType } from "../src/type/orm.type";
 
 const mockLoadData = jest.spyOn(utilsFun, "loadData");
 const mockSaveData = jest.spyOn(utilsFun, "saveData");
-// const mockIsExistFile = jest.spyOn(utilsFun, "isExistFile");
 
 const factoryDocument = (
   document:
@@ -72,7 +70,6 @@ const db: DataBaseType = {
   ] as MetadataType<userType>[],
 };
 
-// mockIsExistFile.mockResolvedValue(true);
 mockLoadData.mockResolvedValue(db);
 mockSaveData.mockResolvedValue(void 0);
 

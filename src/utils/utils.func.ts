@@ -4,9 +4,9 @@ import { open, readFile, stat, mkdir } from "node:fs/promises";
 import { DataBaseType } from "../type/orm.type";
 
 /**
- * load data from database file.
+ * Loads data from database file.
  * @param path_db path to the database file.
- * @returns returns data
+ * @returns Returns data.
  */
 async function loadData(path_db: string): Promise<DataBaseType> {
   let data = "";
@@ -36,7 +36,7 @@ async function loadData(path_db: string): Promise<DataBaseType> {
 }
 
 /**
- * Save data to the database.
+ * Saves data to the database.
  * @param path_db path to the database file.
  * @param data data to save to the database.
  */
@@ -59,9 +59,9 @@ async function saveData(path_db: string, data: DataBaseType) {
 }
 
 /**
- * calulate the size of the database and return the size.
+ * Calulates the size of the database and return the size.
  * @param path_db path to the database file.
- * @returns return size of the database file.
+ * @returns Returns size of the database file.
  */
 async function sizeFile(path_db: string): Promise<string> {
   try {
@@ -88,11 +88,11 @@ function convertToObject(tab: string | Array<string>, _obj?: {}) {
 }
 
 /**
- * create instance of document.
+ * Creates instance of document.
  * @param documents one document or array of documents.
  * @param path_id path to the database file.
  * @param collectionName name of the collection.
- * @returns returns instance of document or an array of documents.
+ * @returns Returns instance of document or an array of documents.
  */
 function defineDocument<T extends Object>(
   documents: T | T[],
@@ -119,9 +119,9 @@ function defineDocument<T extends Object>(
 }
 
 /**
- * format size
+ * Format size.
  * @param sizeInBytes size in octets
- * @returns return the size formatted.
+ * @returns Returns the size formatted.
  */
 function formatSize(sizeInBytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -136,10 +136,10 @@ function formatSize(sizeInBytes: number): string {
 }
 
 /**
- * compare two values
+ * Compare two values.
  * @param a
  * @param b
- * @returns returns true if they are equal, false otherwise
+ * @returns Returns true if they are equal, false otherwise
  * @example
  *  console.log(isEqual(1, 2)); // true
  *  console.log(isEqual("hello", "hello")); // true
@@ -162,7 +162,7 @@ function isEqual(a: any, b: any) {
 }
 
 /**
- * compare two values (namber or string, Date)
+ * Compares two values (namber or string, Date).
  * @param a
  * @param b
  * @param op operator, gt, gte, lt, lte
