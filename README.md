@@ -1,5 +1,9 @@
 # snapjson
 
+![Build Status](https://img.shields.io/badge/build-passing-4cc61e)
+[![npm version](https://badgen.net/npm/v/snapjson)](https://www.npmjs.com/package/snapjson)
+![Size](https://img.shields.io/bundlejs/size/snapjson)
+
 > **snapjson** is a lightweight NoSQL object-relational mapping (ORM) library for Node.js, written in TypeScript. It allows you to store data in JSON files, with each collection represented as an array of documents.
 
 ## Table of Contents
