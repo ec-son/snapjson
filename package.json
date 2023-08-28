@@ -1,13 +1,16 @@
 {
   "name": "snapjson",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple ORM for Node.js using JSON file",
   "author": {
     "name": "Amissi Ec-son",
     "email": "useniecson@gmail.com"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
     "test": "jest --watch"
