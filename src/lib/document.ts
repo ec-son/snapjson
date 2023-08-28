@@ -33,7 +33,7 @@ export class Document<T extends Object> {
   }
 
   /**
-   * Convert this document into JavaScript object.
+   * Converts this document into JavaScript object.
    * @returns Converted document.
    */
   toObject(): T {
@@ -50,7 +50,7 @@ export class Document<T extends Object> {
   }
 
   /**
-   * Convert this document into a JSON.
+   * Converts this document into JSON.
    * @returns String representing the document.
    */
   toJSON(): string {
@@ -66,7 +66,7 @@ export class Document<T extends Object> {
   }
 
   /**
-   * Update this document.
+   * Updates this document.
    * @returns Returns true if the document is successfully updated, false otherwise.
    */
   async save() {
@@ -91,7 +91,7 @@ export class Document<T extends Object> {
   }
 
   /**
-   * Delete this document.
+   * Deletes this document.
    * @returns Returns true if the document is successfully deleted, false otherwise.
    */
   async delete() {

@@ -930,6 +930,6 @@ If you encounter any issues, have questions, or want to contribute to the projec
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/ec-son/orm-json/blob/develop/README.md).
+This project is licensed under the [MIT License](https://github.com/ec-son/orm-json/blob/main/README.md).
 
 ---

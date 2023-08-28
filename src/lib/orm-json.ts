@@ -16,7 +16,7 @@ export class OrmJson {
    */
 
   /**
-   * Create a new collection.
+   * Creates a new collection.
    * @param {string | Object} collection The name of the collection or an object with the following properties:
    *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
@@ -100,7 +100,7 @@ export class OrmJson {
   }
 
   /**
-   * Remove one or many collections.
+   * Removes one or many collections.
    * @param {string | string[]} collections Name of collection to be removed. It can be either a string for single collection or an array of string for multiple collections.
    * @param force [force=false] If true, collections found with data will be removed.
    * @returns The collections(e) that have been removed.
@@ -143,7 +143,7 @@ export class OrmJson {
   }
 
   /**
-   * Get instance of the specified collection
+   * Returns instance of the specified collection
    * @param {string} collectionName Name of collection
    * @returns {Object} Instance of the specified collection if found.
    * @throws If the collection is not found, an error will be thrown.
@@ -158,7 +158,7 @@ export class OrmJson {
   }
 
   /**
-   *  An array of collection names
+   *  Returns an array of collection names
    */
   async getCollections(): Promise<string[]> {
     if (this._collection.length === 0) await this.loadData();
@@ -225,7 +225,7 @@ export class OrmJson {
 }
 
 /**
- * Get instance of collection
+ * Returns instance of collection
  * @param collectionName Name of collection
  * @param path Path of database file
  * @returns Instance of the specified collection if found.
@@ -240,7 +240,7 @@ export async function defineCollection<T extends Object>(
 }
 
 /**
- * Create a new collection.
+ * Creates a new collection.
  * @param {string | { name: string; uniqueKeys?: Array<keyof T> }} collection The name of the collection or an object with the following properties:
  *  - name The name of the collection.
  *  - uniqueKeys An array containing all unique keys in this collection.
@@ -274,7 +274,7 @@ export async function createCollection(
 }
 
 /**
- * Remove one or many collections.
+ * Removes one or many collections.
  * @param {string | string[]} collections Name of collection to be removed. It can be either a string for single collection or an array of string for multiple collections.
  * @param path Path of database file
  * @param force [force=false] If true, collections found with data will be removed.

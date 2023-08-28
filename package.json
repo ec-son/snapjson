@@ -10,7 +10,6 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
-    "dev1": "tsnd  --respawn dev/index.ts",
     "test": "jest --watch"
   },
   "keywords": [
@@ -34,7 +33,7 @@
   "bugs": {
     "url": "https://github.com/ec-son/orm-json/issues"
   },
-  "homepage": "https://github.com/ec-son/orm-json/blob/develop/README.md",
+  "homepage": "https://github.com/ec-son/orm-json/blob/main/README.md",
   "devDependencies": {
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.8",
