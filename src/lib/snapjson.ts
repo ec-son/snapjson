@@ -220,7 +220,7 @@ export class SnapJson {
   }
 
   private async saveData(data: DataBaseType) {
-    saveData(this._pathDB, data);
+    await saveData(this._pathDB, data);
   }
 }
 
