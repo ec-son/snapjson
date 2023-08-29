@@ -2,6 +2,7 @@ import { Collection } from "../src/lib/collection";
 import {
   SnapJson,
   createCollection,
+  defineCollection,
   removeCollection,
 } from "../src/lib/snapjson";
 import { DataBaseType, MetadataType } from "../src/type/orm.type";
@@ -49,6 +50,7 @@ mockSaveData.mockResolvedValue(void 0);
  * removeCollection
  * removeCollection helper
  * collection
+ * defineCollection helper
  * size
  */
 describe("data base", () => {
@@ -94,6 +96,15 @@ describe("Collection", () => {
   });
 
   /**
+   * DEFINING COLLECTION
+   */
+
+  it("should create a new collection instance", async () => {
+    const expected = new Collection(path_db, "user");
+    await expect(orm.collection("user")).resolves.toEqual(expected);
+  });
+
+  /**
    * REMOVING COLLECTION FROM DATABASE
    */
 
@@ -131,7 +142,7 @@ describe("Collection", () => {
       convertToObject(data, _db);
       _db["__metadata__"].push(...metadata);
 
-      mockLoadData.mockResolvedValue(structuredClone(_db));
+      mockLoadData.mockResolvedValueOnce(structuredClone(_db));
       await expect(orm.removeCollection(collections, force)).resolves.toEqual(
         expected
       );
@@ -166,7 +177,7 @@ describe("Collection", () => {
         }))
       );
 
-      mockLoadData.mockResolvedValue(structuredClone(_db));
+      mockLoadData.mockResolvedValueOnce(structuredClone(_db));
       await orm.removeCollection(collections, force);
       expect(mockSaveData).toHaveBeenNthCalledWith(1, path_db, expectedDB);
     }
@@ -181,7 +192,7 @@ describe("Collection", () => {
     "should return undefined when removing collection from database which has no collection",
     async (collection) => {
       const expected = Array.isArray(collection) ? [] : undefined;
-      mockLoadData.mockResolvedValue({});
+      mockLoadData.mockResolvedValueOnce({});
       await expect(orm.removeCollection(collection)).resolves.toEqual(expected);
     }
   );
@@ -232,15 +243,18 @@ describe("Collection", () => {
     "should return the created collection",
     async ({ collections, expected, force }) => {
       const _db = structuredClone(db);
-      mockLoadData.mockResolvedValue(_db);
-      if (Array.isArray(collections))
+      mockLoadData.mockResolvedValueOnce(_db);
+      if (Array.isArray(collections)) {
+        const _expected = (expected as Array<string>).map(
+          (el) => new Collection(path_db, el)
+        );
         await expect(
           orm.createCollections(collections as string[], force)
-        ).resolves.toEqual(expected);
-      else
+        ).resolves.toEqual(_expected);
+      } else
         await expect(
           orm.createCollection(collections as string, force)
-        ).resolves.toEqual(expected);
+        ).resolves.toEqual(new Collection(path_db, expected as string));
     }
   );
 
@@ -260,7 +274,7 @@ describe("Collection", () => {
         expectedObject["__metadata__"] = [];
       expectedObject["__metadata__"].push(...(metadata as any));
 
-      mockLoadData.mockResolvedValue(_db);
+      mockLoadData.mockResolvedValueOnce(_db);
       await orm.createCollection(collections as string, force);
 
       expect(mockSaveData).toHaveBeenNthCalledWith(1, path_db, expectedObject);
@@ -273,7 +287,7 @@ describe("Collection", () => {
     "should throw an error when creating collection",
     async (collection) => {
       const _db = structuredClone(db);
-      mockLoadData.mockResolvedValue(_db);
+      mockLoadData.mockResolvedValueOnce(_db);
       await expect(
         orm.createCollection(collection as string)
       ).rejects.toThrow();
@@ -293,7 +307,7 @@ describe("Collection", () => {
       const db = convertToObject(collection);
       db["__metadata__"] = metadata;
 
-      mockLoadData.mockResolvedValue({});
+      mockLoadData.mockResolvedValueOnce({});
 
       if (Array.isArray(_collection)) await orm.createCollections(_collection);
       else await orm.createCollection(_collection as string);
@@ -308,19 +322,26 @@ describe("Collection", () => {
  */
 
 describe("management collection with helper function", () => {
-  it("should return a created collection", async () => {
-    await expect(createCollection("collection1")).resolves.toBe("collection1");
+  it("should return a created collection as instance", async () => {
+    const expected = new Collection(path_db, "collection1");
+    await expect(createCollection("collection1", path_db)).resolves.toEqual(
+      expected
+    );
   });
 
-  it("should return a created collections", async () => {
+  it("should return a created collections as array of instance", async () => {
+    const expected = [
+      new Collection(path_db, "collection2"),
+      new Collection(path_db, "collection3"),
+    ];
     await expect(
-      createCollection(["collection2", "collection3"])
-    ).resolves.toEqual(["collection2", "collection3"]);
+      createCollection(["collection2", "collection3"], path_db)
+    ).resolves.toEqual(expected);
   });
 
   it("should create a new collection instance", async () => {
-    mockLoadData.mockResolvedValue(db);
-    await expect(orm.collection("user")).resolves.toBeInstanceOf(Collection);
+    const expected = new Collection(path_db, "user");
+    await expect(defineCollection("user", path_db)).resolves.toEqual(expected);
   });
 
   const table1 = ["collection", ["collection1", "collection2"]];
