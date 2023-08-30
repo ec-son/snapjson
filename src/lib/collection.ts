@@ -1,3 +1,4 @@
+import { DocumentDataType } from "../types/document-data.type";
 import {
   CollectionType,
   DataBaseType,
@@ -5,7 +6,7 @@ import {
   QueryOneOptionType,
   QueryOptionType,
   QueryType,
-} from "../type/orm.type";
+} from "../types/orm.type";
 import {
   defineDocument,
   formatSize,
@@ -22,15 +23,15 @@ export class Collection<
   private metadata: MetadataType<T>;
 
   constructor(
-    private readonly _pathDB: string,
-    private readonly _collectionName: string
+    private readonly _collectionName: string,
+    private readonly _pathDB: string
   ) {
     this.metadata = { collectionName: _collectionName, unique: [] };
   }
 
   //SELECT
 
-  async findById(__id: number): Promise<(Document<U> & U) | undefined>;
+  async findById(__id: number): Promise<DocumentDataType<U> | undefined>;
 
   async findById<
     X extends Array<keyof U> | undefined = undefined,
@@ -40,18 +41,18 @@ export class Collection<
   >(
     __id: number,
     opts: X extends undefined ? QueryOneOptionType<U> : QueryOneOptionType<U, X>
-  ): Promise<(Document<Y> & Y) | undefined>;
+  ): Promise<DocumentDataType<Y> | undefined>;
 
   async findById(__id: number, opts?: any): Promise<any> {
     return this.select({ __id } as QueryType<Partial<U>>, {
       ...opts,
       limit: 1,
-    }) as Promise<(Document<any> & any) | undefined>;
+    }) as Promise<DocumentDataType<any> | undefined>;
   }
 
   async findOne(
     query: QueryType<Partial<U>>
-  ): Promise<(Document<U> & U) | undefined>;
+  ): Promise<DocumentDataType<U> | undefined>;
 
   async findOne<
     X extends Array<keyof U> | undefined = undefined,
@@ -61,19 +62,19 @@ export class Collection<
   >(
     query: QueryType<Partial<U>>,
     opts: X extends undefined ? QueryOneOptionType<U> : QueryOneOptionType<U, X>
-  ): Promise<(Document<Y> & Y) | undefined>;
+  ): Promise<DocumentDataType<Y> | undefined>;
 
   async findOne(
     query: QueryType<any>,
     opts?: any
-  ): Promise<(Document<any> & any) | undefined> {
+  ): Promise<DocumentDataType<any> | undefined> {
     return this.select(query, {
       ...opts,
       limit: 1,
-    } as QueryOptionType<any>) as Promise<(Document<any> & any) | undefined>;
+    } as QueryOptionType<any>) as Promise<DocumentDataType<any> | undefined>;
   }
 
-  async find(query: QueryType<Partial<U>>): Promise<Array<Document<U> & U>>;
+  async find(query: QueryType<Partial<U>>): Promise<Array<DocumentDataType<U>>>;
 
   async find<
     X extends Array<keyof U> | undefined = undefined,
@@ -83,20 +84,20 @@ export class Collection<
   >(
     query: QueryType<Partial<U>>,
     opts: X extends undefined ? QueryOptionType<U> : QueryOptionType<U, X>
-  ): Promise<Array<Document<Y> & Y>>;
+  ): Promise<Array<DocumentDataType<Y>>>;
 
   async find(
     query: QueryType<Partial<U>>,
     opts?: any
-  ): Promise<Array<Document<any> & any>> {
-    return this.select(query, opts) as Promise<Array<Document<any> & any>>;
+  ): Promise<Array<DocumentDataType<any>>> {
+    return this.select(query, opts) as Promise<Array<DocumentDataType<any>>>;
   }
 
   private async select(
     query: QueryType<any>,
     opts?: QueryOptionType<any>
-  ): Promise<(Document<any> & any) | Array<Document<any> & any> | undefined> {
-    const collectionDB = await this.loadData();
+  ): Promise<DocumentDataType<any> | Array<DocumentDataType<any>> | undefined> {
+    const collectionDB = await this.loadCollectionData();
     const queryInstance = new Query(
       query,
       structuredClone(collectionDB),
@@ -105,34 +106,34 @@ export class Collection<
     const result = queryInstance.getData();
     if (!result) return undefined;
     return defineDocument(result, this.pathDB, this._collectionName) as Array<
-      Document<any> & any
+      DocumentDataType<any>
     >;
   }
 
   // INSERT
 
-  async add(data: T): Promise<Document<U> & U> {
-    return this.insert(data) as Promise<Document<U> & U>;
+  async add(data: T): Promise<DocumentDataType<U>> {
+    return this.insert(data) as Promise<DocumentDataType<U>>;
   }
 
-  async create(data: T): Promise<Document<U> & U> {
-    return this.insert(data) as Promise<Document<U> & U>;
+  async create(data: T): Promise<DocumentDataType<U>> {
+    return this.insert(data) as Promise<DocumentDataType<U>>;
   }
 
-  async insertOne(data: T): Promise<Document<U> & U> {
-    return this.insert(data) as Promise<Document<U> & U>;
+  async insertOne(data: T): Promise<DocumentDataType<U>> {
+    return this.insert(data) as Promise<DocumentDataType<U>>;
   }
 
-  async insertMany(data: T[]): Promise<Array<Document<U> & U>> {
-    return this.insert(data) as Promise<Array<Document<U> & U>>;
+  async insertMany(data: T[]): Promise<Array<DocumentDataType<U>>> {
+    return this.insert(data) as Promise<Array<DocumentDataType<U>>>;
   }
 
   private async insert(
     data: T[] | T
-  ): Promise<(Document<U> & U) | Array<Document<U> & U>> {
+  ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>>> {
     const isArray = Array.isArray(data);
     if (!Array.isArray(data)) data = [data];
-    const collectionDB = await this.loadData();
+    const collectionDB = await this.loadCollectionData();
     const tab: U[] = [];
     for (const key in data) {
       const element = data[key];
@@ -146,13 +147,13 @@ export class Collection<
     await this.saveData(collectionDB);
     return isArray
       ? (defineDocument(tab, this.pathDB, this._collectionName) as Array<
-          Document<U> & U
+          DocumentDataType<U>
         >)
       : (defineDocument(
           tab[0],
           this.pathDB,
           this._collectionName
-        ) as Document<U> & U);
+        ) as DocumentDataType<U>);
   }
 
   // UPDATE
@@ -160,16 +161,16 @@ export class Collection<
   async updateOne(
     data: Partial<T>,
     query: QueryType<Partial<U>>
-  ): Promise<(Document<U> & U) | null> {
-    return this.update(data, query) as Promise<(Document<U> & U) | null>;
+  ): Promise<DocumentDataType<U> | null> {
+    return this.update(data, query) as Promise<DocumentDataType<U> | null>;
   }
 
   async updateMany(
     data: Partial<T>,
     query: QueryType<Partial<U>>
-  ): Promise<Array<Document<U> & U> | null> {
+  ): Promise<Array<DocumentDataType<U>> | null> {
     return this.update(data, query, true) as Promise<Array<
-      Document<U> & U
+      DocumentDataType<U>
     > | null>;
   }
 
@@ -177,8 +178,8 @@ export class Collection<
     data: Partial<T>,
     query: QueryType<Partial<U>>,
     isMany?: boolean
-  ): Promise<(Document<U> & U) | Array<Document<U> & U> | null> {
-    const collectionDB = await this.loadData();
+  ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>> | null> {
+    const collectionDB = await this.loadCollectionData();
     const queryInstance = new Query(query, structuredClone(collectionDB));
     let result = queryInstance.getData() as CollectionType<U>;
 
@@ -205,32 +206,34 @@ export class Collection<
     await this.saveData(collectionDB);
     return isMany
       ? (defineDocument(updated, this.pathDB, this._collectionName) as Array<
-          Document<U> & U
+          DocumentDataType<U>
         >)
       : (defineDocument(
           updated[0],
           this.pathDB,
           this._collectionName
-        ) as Document<U> & U);
+        ) as DocumentDataType<U>);
   }
 
   async deleteOne(
     query: QueryType<Partial<U>>
-  ): Promise<(Document<U> & U) | null> {
-    return this.delete(query) as Promise<(Document<U> & U) | null>;
+  ): Promise<DocumentDataType<U> | null> {
+    return this.delete(query) as Promise<DocumentDataType<U> | null>;
   }
 
   async deleteMany(
     query: QueryType<Partial<U>>
-  ): Promise<Array<Document<U> & U> | null> {
-    return this.delete(query, true) as Promise<Array<Document<U> & U> | null>;
+  ): Promise<Array<DocumentDataType<U>> | null> {
+    return this.delete(query, true) as Promise<Array<
+      DocumentDataType<U>
+    > | null>;
   }
 
   private async delete(
     query: QueryType<Partial<U>>,
     isMany?: boolean
-  ): Promise<(Document<U> & U) | Array<Document<U> & U> | null> {
-    const collectionDB = await this.loadData();
+  ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>> | null> {
+    const collectionDB = await this.loadCollectionData();
     const queryInstance = new Query(query, structuredClone(collectionDB));
     const result = queryInstance.getData() as CollectionType<U>;
 
@@ -246,7 +249,7 @@ export class Collection<
           resultOfDeleted[0],
           this.pathDB,
           this._collectionName
-        ) as Document<U> & U;
+        ) as DocumentDataType<U>;
       }
     }
 
@@ -255,7 +258,7 @@ export class Collection<
       resultOfDeleted,
       this.pathDB,
       this._collectionName
-    ) as Array<Document<U> & U>;
+    ) as Array<DocumentDataType<U>>;
   }
 
   private async constrain(
@@ -286,7 +289,7 @@ export class Collection<
   private async _lastIdInsert(
     collectionDB?: CollectionType<U>
   ): Promise<number> {
-    collectionDB = collectionDB || (await this.loadData());
+    collectionDB = collectionDB || (await this.loadCollectionData());
     return collectionDB.length > 0
       ? collectionDB[collectionDB.length - 1].__id
       : 0;
@@ -301,7 +304,7 @@ export class Collection<
   async addUniqueKey(
     keyName: keyof T | Array<keyof T>
   ): Promise<typeof keyName> {
-    await this.loadData();
+    await this.loadCollectionData();
     const isArray = Array.isArray(keyName);
     let isAddedKey = false;
     if (!Array.isArray(keyName)) keyName = [keyName];
@@ -322,7 +325,7 @@ export class Collection<
   async removeUniqueKey(
     uniqueKey: keyof T | Array<keyof T>
   ): Promise<typeof uniqueKey | undefined> {
-    await this.loadData();
+    await this.loadCollectionData();
 
     const isArray = Array.isArray(uniqueKey);
     if (!Array.isArray(uniqueKey)) uniqueKey = [uniqueKey];
@@ -341,7 +344,7 @@ export class Collection<
    * Removes all unique keys
    */
   async removeAllUniqueKeys(): Promise<Array<keyof T>> {
-    await this.loadData();
+    await this.loadCollectionData();
     const keys = this.metadata.unique;
     this.metadata.unique = [];
     await this.saveMetadata();
@@ -352,7 +355,7 @@ export class Collection<
    * Returns all unique keys.
    */
   async getUniqueKeys(): Promise<Array<keyof T>> {
-    await this.loadData();
+    await this.loadCollectionData();
     return this.metadata.unique;
   }
 
@@ -372,7 +375,7 @@ export class Collection<
    * Returns size of this collection.
    */
   async size(): Promise<string> {
-    const collectionString = JSON.stringify(await this.loadData());
+    const collectionString = JSON.stringify(await this.loadCollectionData());
     const blob = new Blob([collectionString]);
     return formatSize(blob.size);
   }
@@ -381,14 +384,16 @@ export class Collection<
    * Counts documents in this collection.
    */
   async count(query?: QueryType<Partial<U>>) {
-    if (!query) return (await this.loadData()).length;
+    if (!query) return (await this.loadCollectionData()).length;
 
     const data = await this.find(query);
     return data.length;
   }
 
-  private async loadData(load: boolean = true): Promise<CollectionType<U>> {
-    const db = await loadData(this._pathDB);
+  private async loadCollectionData(
+    load: boolean = true
+  ): Promise<CollectionType<U>> {
+    const db = await this.loadData();
     if (load) {
       this.loadDataLocally(db);
     }
@@ -403,13 +408,22 @@ export class Collection<
   }
 
   private async saveData(data: CollectionType<U>) {
-    const db = await loadData(this._pathDB);
+    const db = await this.loadData();
     db[this._collectionName] = data as Record<string, any>[];
     await saveData(this._pathDB, db);
   }
 
-  private async saveMetadata() {
+  private async loadData(): Promise<DataBaseType> {
+    if (!this._collectionName || this._collectionName === "__metadata__")
+      throw new Error(`Collection '${this._collectionName}' doesn't exist.`);
     const db = await loadData(this._pathDB);
+    if (!(this._collectionName in db))
+      throw new Error(`Collection '${this._collectionName}' doesn't exist.`);
+    return db;
+  }
+
+  private async saveMetadata() {
+    const db = await this.loadData();
     const index = (db["__metadata__"] as Array<MetadataType<T>>).findIndex(
       (metadata) => metadata.collectionName === this.collectionName
     );

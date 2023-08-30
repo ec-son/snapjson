@@ -1,6 +1,6 @@
 import { Collection } from "./collection";
 import { loadData, saveData, sizeFile } from "../utils/utils.func";
-import { DataBaseType, MetadataType } from "../type/orm.type";
+import { DataBaseType, MetadataType } from "../types/orm.type";
 
 export class SnapJson {
   private _pathDB: string;
@@ -162,9 +162,9 @@ export class SnapJson {
     collectionName: string
   ): Promise<Collection<T>> {
     if (!(await this.isExistCollection(collectionName))) {
-      throw new Error(`Collection '${collectionName}' doesn't exist`);
+      throw new Error(`Collection '${collectionName}' doesn't exist.`);
     }
-    return new Collection<T>(this._pathDB, collectionName);
+    return new Collection<T>(collectionName, this._pathDB);
   }
 
   /**
@@ -192,6 +192,7 @@ export class SnapJson {
    * }
    */
   async isExistCollection(collection: string): Promise<boolean> {
+    if (!collection && collection === "__metadata__") return false;
     if (this._collection.length === 0) await this.loadData();
     return this._collection.includes(collection);
   }

@@ -4,7 +4,7 @@ import {
   PropOp,
   QueryOptionType,
   QueryType,
-} from "../type/orm.type";
+} from "../types/orm.type";
 import { compare, isEqual } from "../utils/utils.func";
 
 export class Query<U extends Object> {

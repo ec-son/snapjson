@@ -8,7 +8,7 @@ import {
   saveData,
   sizeFile,
 } from "../src/utils/utils.func";
-import { DataBaseType } from "../src/type/orm.type";
+import { DataBaseType } from "../src/types/orm.type";
 
 jest.mock("node:fs/promises", () => {
   return {

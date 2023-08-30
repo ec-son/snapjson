@@ -1,7 +1,7 @@
 import * as utilsFun from "../src/utils/utils.func";
 import { Collection } from "../src/lib/collection";
 import { SnapJson, defineCollection } from "../src/lib/snapjson";
-import { DataBaseType, MetadataType, QueryType } from "../src/type/orm.type";
+import { DataBaseType, MetadataType, QueryType } from "../src/types/orm.type";
 
 const mockLoadData = jest.spyOn(utilsFun, "loadData");
 const mockSaveData = jest.spyOn(utilsFun, "saveData");
@@ -74,6 +74,8 @@ mockLoadData.mockResolvedValue(db);
 mockSaveData.mockResolvedValue(void 0);
 
 /**
+ * Collection class
+ *
  * lastIdInsert
  * size
  *
@@ -109,6 +111,27 @@ beforeEach(() => {
   mockSaveData.mockClear();
   mockSaveData.mockImplementationOnce((path_id, data) =>
     Promise.resolve<any>(data)
+  );
+});
+
+/**
+ * COLLECTION CLASS
+ */
+
+describe("collection instance", () => {
+  it("should return a collection instance", async () => {
+    const _user = await defineCollection("user", path_db);
+    expect(new Collection("user", path_db)).toEqual(_user);
+  });
+
+  const table1 = [undefined, "", "collectionNotFound"];
+
+  it.each(table1)(
+    "throw an error when collection do not exist",
+    async (collectionName) => {
+      const collection = new Collection(collectionName as string, path_db);
+      await expect(collection.count()).rejects.toThrow();
+    }
   );
 });
 

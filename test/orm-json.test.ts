@@ -5,7 +5,7 @@ import {
   defineCollection,
   removeCollection,
 } from "../src/lib/snapjson";
-import { DataBaseType, MetadataType } from "../src/type/orm.type";
+import { DataBaseType, MetadataType } from "../src/types/orm.type";
 import * as utilsFun from "../src/utils/utils.func";
 import { convertToObject } from "../src/utils/utils.func";
 
@@ -100,7 +100,7 @@ describe("Collection", () => {
    */
 
   it("should create a new collection instance", async () => {
-    const expected = new Collection(path_db, "user");
+    const expected = new Collection("user", path_db);
     await expect(orm.collection("user")).resolves.toEqual(expected);
   });
 
@@ -246,7 +246,7 @@ describe("Collection", () => {
       mockLoadData.mockResolvedValueOnce(_db);
       if (Array.isArray(collections)) {
         const _expected = (expected as Array<string>).map(
-          (el) => new Collection(path_db, el)
+          (el) => new Collection(el, path_db)
         );
         await expect(
           orm.createCollections(collections as string[], force)
@@ -254,7 +254,7 @@ describe("Collection", () => {
       } else
         await expect(
           orm.createCollection(collections as string, force)
-        ).resolves.toEqual(new Collection(path_db, expected as string));
+        ).resolves.toEqual(new Collection(expected as string, path_db));
     }
   );
 
@@ -323,7 +323,7 @@ describe("Collection", () => {
 
 describe("management collection with helper function", () => {
   it("should return a created collection as instance", async () => {
-    const expected = new Collection(path_db, "collection1");
+    const expected = new Collection("collection1", path_db);
     await expect(createCollection("collection1", path_db)).resolves.toEqual(
       expected
     );
@@ -331,8 +331,8 @@ describe("management collection with helper function", () => {
 
   it("should return a created collections as array of instance", async () => {
     const expected = [
-      new Collection(path_db, "collection2"),
-      new Collection(path_db, "collection3"),
+      new Collection("collection2", path_db),
+      new Collection("collection3", path_db),
     ];
     await expect(
       createCollection(["collection2", "collection3"], path_db)
@@ -340,7 +340,7 @@ describe("management collection with helper function", () => {
   });
 
   it("should create a new collection instance", async () => {
-    const expected = new Collection(path_db, "user");
+    const expected = new Collection("user", path_db);
     await expect(defineCollection("user", path_db)).resolves.toEqual(expected);
   });
 
