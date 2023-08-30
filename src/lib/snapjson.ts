@@ -21,7 +21,7 @@ export class SnapJson {
    *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
    * @param {boolean} force [force=false] If true, existing collection with the same name will be overwritten.
-   * @returns The name of collection
+   * @returns Collection instance.
    */
   async createCollection<T extends Object>(
     collection:
@@ -40,7 +40,7 @@ export class SnapJson {
    *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
    * @param force [force=false] If true, existing collection with the same name will be overwritten.
-   * @returns An array of collection names.
+   * @returns An array of collection instances
    */
   async createCollections<T extends Object>(
     collections:
@@ -257,7 +257,7 @@ export async function defineCollection<T extends Object>(
  *  - uniqueKeys An array containing all unique keys in this collection.
  * @param path Path of database file
  * @param force [force=false] If true, existing collection with the same name will be overwritten.
- * @returns Returns the name of collection
+ * @returns Collection instance(s).
  */
 export async function createCollection<T extends Object>(
   collection: string | { collectionName: string; uniqueKeys?: Array<keyof T> },

@@ -13,19 +13,20 @@ import {
   loadData,
   saveData,
 } from "../utils/utils.func";
-import { Document } from "./document";
 import { Query } from "./query";
 
 export class Collection<
   T extends Object,
   U extends T & { readonly __id: number } = { readonly __id: number } & T
 > {
+  private _pathDB: string;
   private metadata: MetadataType<T>;
 
   constructor(
     private readonly _collectionName: string,
-    private readonly _pathDB: string
+    private readonly path?: string
   ) {
+    this._pathDB = path || "db/db.json";
     this.metadata = { collectionName: _collectionName, unique: [] };
   }
 
