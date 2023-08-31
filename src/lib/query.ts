@@ -30,8 +30,6 @@ export class Query<U extends Object> {
 
     // offset
     if (offset) {
-      // if (offset < 1) offset = 0;
-      // else offset -= 1;
       this.collectionDB = this.collectionDB.slice(offset);
     }
 
