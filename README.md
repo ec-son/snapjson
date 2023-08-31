@@ -14,6 +14,10 @@
   - [ Creating an instance of `SnapJson`](#creating-an-instance-of-snapjson)
   - [Defining the data schema](#defining-the-data-schema)
   - [Creating a collection](#creating-a-collection)
+  - [Defining a collection](#defining-a-collection)
+    - [Method 1: Using the SnapJson Class](#method-1-using-the-snapjson-class)
+    - [Method 2: Using shortcut helper function](#method-2-using-shortcut-helper-function)
+    - [Method 3: Using the Collection Class](#method-3-using-the-collection-class)
   - [Removing a collection](#removing-a-collection)
   - [Query Methods](#query-methods)
     - [Inserting documents](#inserting-documents)
@@ -48,8 +52,22 @@
 
 ## Installation
 
+Using npm:
+
 ```bash
 npm install snapjson
+```
+
+Using yarn:
+
+```bash
+yarn add snapjson
+```
+
+Using pnpm:
+
+```bash
+pnpm add snapjson
 ```
 
 ## Getting Started
@@ -86,7 +104,7 @@ interface UserSchema {
 
 ```typescript
 // Option 1: Simple collection creation
-const collection = await orm.createCollection("user"); // It returns the collection name when it is created.
+const collection = await orm.createCollection("user"); // It returns instance of this collection.
 console.log(collection); // user
 
 // Option 2: Creating multiple collections at once
@@ -108,6 +126,39 @@ Alternatively, you can use a shortcut helper function:
 const collection = await createCollection("user");
 const collections = await createCollection(["user", "teacher"]);
 ```
+
+### Defining a collection
+
+To define a collection, you have three methods available:
+
+#### Method 1: Using the SnapJson Class
+
+```typescript
+import { SnapJson } from "snapjson";
+const path = ""; // default path is db/db.json
+const orm = new SnapJson(path);
+const usersCollection = await orm.collection<UserSchema>("user");
+```
+
+This will return an instance of this collection if it exists, otherwise, an error will be thrown.
+
+#### Method 2: Using shortcut helper function
+
+```typescript
+import { defineCollection } from "snapjson";
+const path = ""; // default path is db/db.json
+const usersCollection = await defineCollection<UserSchema>("user", path);
+```
+
+#### Method 3: Using the Collection Class
+
+```typescript
+import { Collection } from "snapjson";
+const path = ""; // default path is db/db.json
+const usersCollection = new Collection<UserSchema>("user", path);
+```
+
+The key difference between these methods is in their verification timing. The first and second method check if the collection exists before instantiation, while the third method checks upon execution of query methods such as `find`, `findOne`, and more.
 
 ### Removing a collection
 

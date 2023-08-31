@@ -4,7 +4,7 @@ import {
   PropOp,
   QueryOptionType,
   QueryType,
-} from "../type/orm.type";
+} from "../types/orm.type";
 import { compare, isEqual } from "../utils/utils.func";
 
 export class Query<U extends Object> {
@@ -13,14 +13,33 @@ export class Query<U extends Object> {
   constructor(
     private query: QueryType<Partial<U>>,
     private collectionDB: CollectionType<U>,
-    { limit, select, sort }: QueryOptionType<U> = {} as QueryOptionType<U>
+    {
+      limit,
+      select,
+      sort,
+      offset,
+    }: QueryOptionType<U> = {} as QueryOptionType<U>
   ) {
+    // get data
     this.collectionDB = this.selectModel(this.query, this.collectionDB);
+
+    // sort
     this.collectionDB = this.collectionDB.sort((a, b) =>
       this.compare(a, b, sort)
     );
+
+    // offset
+    if (offset) {
+      // if (offset < 1) offset = 0;
+      // else offset -= 1;
+      this.collectionDB = this.collectionDB.slice(offset);
+    }
+
+    // select
     if (select)
       this.collectionDB = this.selectProperties(this.collectionDB, select);
+
+    // limit
     this.limitDocument(limit);
   }
 
@@ -259,25 +278,25 @@ export class Query<U extends Object> {
   private compare(
     a: any,
     b: any,
-    obj?: { entity?: keyof U; flag?: "asc" | "desc" }
+    obj?: { property?: keyof U; flag?: "asc" | "desc" }
   ): number {
-    let { entity, flag } = obj || { entity: "__id", flag: "asc" };
+    let { property, flag } = obj || { property: "__id", flag: "asc" };
 
-    entity = entity || "__id";
+    property = property || "__id";
 
-    if (typeof a[entity] === "string") {
-      const a1 = a[entity] as string;
-      const b1 = b[entity] as string;
+    if (typeof a[property] === "string") {
+      const a1 = a[property] as string;
+      const b1 = b[property] as string;
       return flag === "desc" ? b1.localeCompare(a1) : a1.localeCompare(b1);
-    } else if (a[entity] instanceof Date) {
-      const a1 = a[entity] as Date;
-      const b1 = b[entity] as Date;
+    } else if (a[property] instanceof Date) {
+      const a1 = a[property] as Date;
+      const b1 = b[property] as Date;
       return flag === "desc"
         ? b1.getTime() - a1.getTime()
         : a1.getTime() - b1.getTime();
     } else {
-      const a1 = a[entity] as number;
-      const b1 = b[entity] as number;
+      const a1 = a[property] as number;
+      const b1 = b[property] as number;
       return flag === "desc" ? b1 - a1 : a1 - b1;
     }
   }

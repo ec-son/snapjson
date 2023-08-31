@@ -1,7 +1,7 @@
 import * as utilsFun from "../src/utils/utils.func";
 import { Collection } from "../src/lib/collection";
 import { SnapJson, defineCollection } from "../src/lib/snapjson";
-import { DataBaseType, MetadataType, QueryType } from "../src/type/orm.type";
+import { DataBaseType, MetadataType, QueryType } from "../src/types/orm.type";
 
 const mockLoadData = jest.spyOn(utilsFun, "loadData");
 const mockSaveData = jest.spyOn(utilsFun, "saveData");
@@ -74,6 +74,8 @@ mockLoadData.mockResolvedValue(db);
 mockSaveData.mockResolvedValue(void 0);
 
 /**
+ * Collection class
+ *
  * lastIdInsert
  * size
  *
@@ -110,6 +112,32 @@ beforeEach(() => {
   mockSaveData.mockImplementationOnce((path_id, data) =>
     Promise.resolve<any>(data)
   );
+});
+
+/**
+ * COLLECTION CLASS
+ */
+
+describe("collection instance", () => {
+  it("should return a collection instance", async () => {
+    const _user = await defineCollection("user", path_db);
+    expect(new Collection("user", path_db)).toEqual(_user);
+  });
+
+  const table1 = [undefined, "", "collectionNotFound"];
+
+  it.each(table1)(
+    "throw an error when collection do not exist",
+    async (collectionName) => {
+      const collection = new Collection(collectionName as string, path_db);
+      await expect(collection.count()).rejects.toThrow();
+    }
+  );
+
+  it("should create a new collection withput suppliying the path", () => {
+    const collection = new Collection("user");
+    expect(collection.pathDB).toBe("db/db.json");
+  });
 });
 
 /**
@@ -151,18 +179,6 @@ describe("tools methods of collection", () => {
 describe("selecting documents from database", () => {
   it("should select document by id", async () => {
     await expect(user.findById(3)).resolves.toHaveProperty("__id", 3);
-  });
-
-  it("should not return an object with firstName property", async () => {
-    await expect(
-      user.findById(1, { select: ["__id"] })
-    ).resolves.not.toHaveProperty("firstName", 1);
-  });
-
-  it("should not return an object with firstName property", async () => {
-    await expect(
-      user.findOne({ __id: 1 }, { select: ["__id"] })
-    ).resolves.not.toHaveProperty("firstName", 1);
   });
 
   const table1: queryType[] = [
@@ -215,6 +231,13 @@ describe("selecting documents from database", () => {
     }
   );
 
+  it("should return an object with firstName property only", async () => {
+    const document = (
+      await user.findOne({ __id: 1 }, { select: ["firstName"] })
+    )?.toObject();
+    expect(document).toEqual({ firstName: "John" });
+  });
+
   it("should return an sorted array of documents", async () => {
     const expected = [
       { age: 25 },
@@ -226,9 +249,26 @@ describe("selecting documents from database", () => {
     await expect(
       user.find(
         { $or: [{ age: { $in: [25, 21] } }, { age: { $lte: 20 } }] },
-        { select: ["age"], sort: { flag: "desc", entity: "age" } }
+        { select: ["age"], sort: { flag: "desc", property: "age" } }
       )
     ).resolves.toEqual(factoryDocument(expected));
+  });
+
+  it("should return 3 documents", async () => {
+    const length = (await user.find({}, { limit: 3 })).length;
+    expect(length).toBe(3);
+  });
+
+  it("should begin to search from 4th document", async () => {
+    const documents = (await user.find({}, { offset: 3 })).map((el) =>
+      el.toObject()
+    );
+
+    const expected = [
+      { __id: 4, age: 15, email: "crowly@example.com", firstName: "Crowly" },
+      { __id: 5, age: 21, email: "betty@example.com", firstName: "Betty" },
+    ];
+    expect(documents).toEqual(expected);
   });
 });
 
@@ -262,7 +302,7 @@ describe("inserting documents into database", () => {
     });
   });
 
-  it("should throw error when creating a new entity, constrain", async () => {
+  it("should throw error when creating a new document, constrain", async () => {
     const document = { firstName: "John", email: "john@example.com" };
     await expect(user.insertOne(document)).rejects.toThrow();
   });
@@ -304,7 +344,7 @@ describe("updating entities from database", () => {
     { email: { $ne: "john@example.com" }, id: 2 },
   ];
 
-  it.each(table1)("should return updated entity", async (opts) => {
+  it.each(table1)("should return updated document", async (opts) => {
     const { id, ...query } = opts;
     const expected = structuredClone(
       (db["user"] as Array<userType>).find((el) => el.__id === id)
@@ -316,7 +356,7 @@ describe("updating entities from database", () => {
     );
   });
 
-  it("should update entity from database", async () => {
+  it("should update document from database", async () => {
     const expected = {
       __id: 4,
       firstName: "Crowly",
@@ -378,7 +418,7 @@ describe("deleting entities from database", () => {
     { email: { $ne: "john@example.com" }, id: 2 },
   ];
 
-  it.each(table1)("should return deleted  entity", async (opts) => {
+  it.each(table1)("should return deleted  document", async (opts) => {
     const { id, ...query } = opts;
     let expected = structuredClone(
       (db["user"] as Array<userType>).find((el) => el.__id === id)
@@ -392,7 +432,7 @@ describe("deleting entities from database", () => {
     await expect(user.deleteOne(query)).resolves.toEqual(expected);
   });
 
-  it("should delete entity from database", async () => {
+  it("should delete document from database", async () => {
     const expected = {
       __id: 4,
       age: 15,

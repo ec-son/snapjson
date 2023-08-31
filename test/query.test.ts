@@ -1,5 +1,5 @@
 import { Query } from "../src/lib/query";
-import { QueryType } from "../src/type/orm.type";
+import { QueryType } from "../src/types/orm.type";
 
 interface collectionType {
   _id: number;

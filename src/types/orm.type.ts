@@ -64,31 +64,33 @@ type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
       limit?: number;
       select: TSelect;
       sort?: {
-        entity?: keyof T;
+        property?: keyof T;
         flag?: "asc" | "desc";
       };
+      offset?: number;
     }
   : {
       limit?: number;
       select?: Array<keyof TSelect>;
       sort?: {
-        entity?: keyof T;
+        property?: keyof T;
         flag?: "asc" | "desc";
       };
+      offset?: number;
     };
 
 type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
   ? {
       select: TSelect;
       sort?: {
-        entity?: keyof T;
+        property?: keyof T;
         flag?: "asc" | "desc";
       };
     }
   : {
       select?: Array<keyof TSelect>;
       sort?: {
-        entity?: keyof T;
+        property?: keyof T;
         flag?: "asc" | "desc";
       };
     };
