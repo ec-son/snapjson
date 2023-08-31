@@ -1,7 +1,8 @@
 import { dirname } from "path";
 import { Document } from "../lib/document";
 import { open, readFile, stat, mkdir } from "node:fs/promises";
-import { DataBaseType } from "../type/orm.type";
+import { DataBaseType } from "../types/orm.type";
+import { DocumentDataType } from "../types/document-data.type";
 
 /**
  * Loads data from database file.
@@ -98,23 +99,21 @@ function defineDocument<T extends Object>(
   documents: T | T[],
   path_id: string,
   collectionName: string
-):
-  | (Document<T> & T)
-  | Array<Document<T> & T>
-  | (Document<T> & Partial<T>)
-  | Array<Document<T> & Partial<T>> {
+): DocumentDataType<T> | Array<DocumentDataType<T>> {
   if (!Array.isArray(documents))
     return new Document<T>(
       structuredClone(documents),
       path_id,
       collectionName
-    ) as (Document<T> & Partial<T>) | (Document<T> & T);
+    ) as unknown as DocumentDataType<T>;
   else
     return documents.map(
       (el) =>
-        new Document<T>(structuredClone(el), path_id, collectionName) as
-          | (Document<T> & Partial<T>)
-          | (Document<T> & Partial<T>)
+        new Document<T>(
+          structuredClone(el),
+          path_id,
+          collectionName
+        ) as unknown as DocumentDataType<T>
     );
 }
 

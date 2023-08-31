@@ -5,3 +5,4 @@ db
 *db.json
 src/test.*
 .env
+tasks.yaml

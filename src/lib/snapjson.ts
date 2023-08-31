@@ -1,6 +1,6 @@
 import { Collection } from "./collection";
 import { loadData, saveData, sizeFile } from "../utils/utils.func";
-import { DataBaseType, MetadataType } from "../type/orm.type";
+import { DataBaseType, MetadataType } from "../types/orm.type";
 
 export class SnapJson {
   private _pathDB: string;
@@ -21,15 +21,17 @@ export class SnapJson {
    *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
    * @param {boolean} force [force=false] If true, existing collection with the same name will be overwritten.
-   * @returns The name of collection
+   * @returns Collection instance.
    */
-  async createCollection<T>(
+  async createCollection<T extends Object>(
     collection:
       | string
       | { collectionName: string; uniqueKeys?: Array<keyof T> },
     force?: boolean
-  ): Promise<string> {
-    return this.creatingCollection(collection, force) as Promise<string>;
+  ): Promise<Collection<T>> {
+    return this.creatingCollection<T>(collection, force) as Promise<
+      Collection<T>
+    >;
   }
 
   /**
@@ -38,21 +40,23 @@ export class SnapJson {
    *  - collectionName The name of the collection.
    *  - uniqueKeys An array containing all unique keys in this collection.
    * @param force [force=false] If true, existing collection with the same name will be overwritten.
-   * @returns An array of collection names.
+   * @returns An array of collection instances
    */
-  async createCollections<T>(
+  async createCollections<T extends Object>(
     collections:
       | string[]
       | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
     force?: boolean
-  ): Promise<string[]> {
-    return this.creatingCollection(collections, force) as Promise<string[]>;
+  ): Promise<Collection<T>[]> {
+    return this.creatingCollection<T>(collections, force) as Promise<
+      Collection<T>[]
+    >;
   }
 
-  private async creatingCollection(
+  private async creatingCollection<T extends Object>(
     collections: any,
     force?: boolean
-  ): Promise<string | string[]> {
+  ): Promise<Collection<T> | Collection<T>[]> {
     const db = await this.loadData();
     const isArray = Array.isArray(collections);
     const collectionsTab: string[] = [];
@@ -96,7 +100,13 @@ export class SnapJson {
       await this.saveData(db);
     }
 
-    return isArray ? collectionsTab : collectionsTab[0];
+    if (!isArray) return this.collection<T>(collectionsTab[0]);
+    const col: Collection<T>[] = [];
+    for (const iterator of collectionsTab) {
+      const instance = await this.collection<T>(iterator);
+      col.push(instance);
+    }
+    return col;
   }
 
   /**
@@ -152,9 +162,9 @@ export class SnapJson {
     collectionName: string
   ): Promise<Collection<T>> {
     if (!(await this.isExistCollection(collectionName))) {
-      throw new Error(`Collection '${collectionName}' doesn't exist`);
+      throw new Error(`Collection '${collectionName}' doesn't exist.`);
     }
-    return new Collection<T>(this._pathDB, collectionName);
+    return new Collection<T>(collectionName, this._pathDB);
   }
 
   /**
@@ -182,6 +192,7 @@ export class SnapJson {
    * }
    */
   async isExistCollection(collection: string): Promise<boolean> {
+    if (!collection && collection === "__metadata__") return false;
     if (this._collection.length === 0) await this.loadData();
     return this._collection.includes(collection);
   }
@@ -246,31 +257,31 @@ export async function defineCollection<T extends Object>(
  *  - uniqueKeys An array containing all unique keys in this collection.
  * @param path Path of database file
  * @param force [force=false] If true, existing collection with the same name will be overwritten.
- * @returns Returns the name of collection
+ * @returns Collection instance(s).
  */
-export async function createCollection<T>(
+export async function createCollection<T extends Object>(
   collection: string | { collectionName: string; uniqueKeys?: Array<keyof T> },
   path?: string,
   force?: boolean
-): Promise<string>;
+): Promise<Collection<T>>;
 
-export async function createCollection<T>(
+export async function createCollection<T extends Object>(
   collections:
     | string[]
     | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
   path?: string,
   force?: boolean
-): Promise<string[]>;
+): Promise<Collection<T>[]>;
 
-export async function createCollection(
+export async function createCollection<T extends Object>(
   collections: any,
   path?: string,
   force?: boolean
-): Promise<string | string[]> {
+): Promise<Collection<T> | Collection<T>[]> {
   const orm = new SnapJson(path);
   if (Array.isArray(collections))
-    return orm.createCollections(collections, force);
-  return orm.createCollection(collections, force);
+    return orm.createCollections<T>(collections, force);
+  return orm.createCollection<T>(collections, force);
 }
 
 /**
