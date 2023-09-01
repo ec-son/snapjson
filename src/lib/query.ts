@@ -301,7 +301,7 @@ export class Query<U extends Object> {
 
   private limitDocument(limit?: number): void {
     if (!limit) this.data = this.collectionDB;
-    else if (limit === 1) this.data = this.collectionDB[0];
+    else if (limit === -1) this.data = this.collectionDB[0];
     else this.data = this.collectionDB.slice(0, limit);
   }
 
