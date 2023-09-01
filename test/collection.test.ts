@@ -270,6 +270,11 @@ describe("selecting documents from database", () => {
     ];
     expect(documents).toEqual(expected);
   });
+
+  it("should return array", async () => {
+    const documents = await user.find({}, { limit: 1 });
+    expect(Array.isArray(documents)).toBeTruthy();
+  });
 });
 
 /**
