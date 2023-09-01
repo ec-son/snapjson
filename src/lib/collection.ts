@@ -47,7 +47,7 @@ export class Collection<
   async findById(__id: number, opts?: any): Promise<any> {
     return this.select({ __id } as QueryType<Partial<U>>, {
       ...opts,
-      limit: 1,
+      limit: -1,
     }) as Promise<DocumentDataType<any> | undefined>;
   }
 
@@ -71,7 +71,7 @@ export class Collection<
   ): Promise<DocumentDataType<any> | undefined> {
     return this.select(query, {
       ...opts,
-      limit: 1,
+      limit: -1,
     } as QueryOptionType<any>) as Promise<DocumentDataType<any> | undefined>;
   }
 
