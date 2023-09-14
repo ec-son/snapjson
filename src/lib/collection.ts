@@ -138,7 +138,7 @@ export class Collection<
     const tab: U[] = [];
     for (const key in data) {
       const element = data[key];
-      const __id = (await this._lastIdInsert(collectionDB)) + 1;
+      const __id = (await this._lastInsertId(collectionDB)) + 1;
 
       await this.constrain(element, collectionDB);
       tab.push({ ...element, __id } as U);
@@ -283,11 +283,11 @@ export class Collection<
   /**
    * Returns the last id inserted. If no document found, it returns 0
    */
-  async lastIdInsert(): Promise<number> {
-    return this._lastIdInsert();
+  async lastInsertId(): Promise<number> {
+    return this._lastInsertId();
   }
 
-  private async _lastIdInsert(
+  private async _lastInsertId(
     collectionDB?: CollectionType<U>
   ): Promise<number> {
     collectionDB = collectionDB || (await this.loadCollectionData());

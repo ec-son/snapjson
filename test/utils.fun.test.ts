@@ -64,7 +64,7 @@ describe("saving data into database", () => {
     }
   );
 
-  it("should create path if it does not exist", async () => {
+  it("should create path if it doesn't exist", async () => {
     (open as unknown as jest.Mock).mockRejectedValueOnce({ code: "ENOENT" });
     await saveData(path_db, data);
     expect(mockWriteFile).toHaveBeenNthCalledWith(1, JSON.stringify(data), {
@@ -157,7 +157,7 @@ describe("format size", () => {
     await expect(sizeFile(path_db)).resolves.toBe("97.9 KB");
   });
 
-  it("should return O B when database file does not exist", async () => {
+  it("should return O B when database file doesn't exist", async () => {
     (stat as unknown as jest.Mock).mockRejectedValueOnce({ code: "ENOENT" });
     await expect(sizeFile(path_db)).resolves.toBe("0 B");
   });
