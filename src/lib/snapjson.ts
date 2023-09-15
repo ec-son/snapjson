@@ -154,15 +154,19 @@ export class SnapJson {
 
   /**
    * Returns instance of the specified collection
-   * @param {string} collectionName Name of collection
+   * @param {string} collectionName Name of collection.
+   * @param {boolean} force [force=false] Create collection when it doesn't exist.
    * @returns {Object} Instance of the specified collection if found.
    * @throws If the collection is not found, an error will be thrown.
    */
   async collection<T extends Object>(
-    collectionName: string
+    collectionName: string,
+    force: boolean = false
   ): Promise<Collection<T>> {
     if (!(await this.isExistCollection(collectionName))) {
-      throw new Error(`Collection '${collectionName}' doesn't exist.`);
+      if (!force)
+        throw new Error(`Collection '${collectionName}' doesn't exist.`);
+      return this.createCollection(collectionName);
     }
     return new Collection<T>(collectionName, this._pathDB);
   }
@@ -188,7 +192,7 @@ export class SnapJson {
    * if (userExists) {
    *    console.log("The user collection exists.");
    * } else {
-   *    console.log("The user collection does not exist.");
+   *    console.log("The user collection doesn't exist.");
    * }
    */
   async isExistCollection(collection: string): Promise<boolean> {
@@ -239,15 +243,17 @@ export class SnapJson {
  * Returns instance of collection
  * @param collectionName Name of collection
  * @param path Path of database file
+ * @param {boolean} force [force=false] Create collection when it doesn't exist.
  * @returns Instance of the specified collection if found.
  * @throws If the collection is not found, an error will be thrown.
  */
 export async function defineCollection<T extends Object>(
   collectionName: string,
-  path?: string
+  path?: string,
+  force: boolean = false
 ): Promise<Collection<T>> {
   const orm = new SnapJson(path);
-  return orm.collection(collectionName);
+  return orm.collection(collectionName, force);
 }
 
 /**

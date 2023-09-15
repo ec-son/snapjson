@@ -138,6 +138,8 @@ import { SnapJson } from "snapjson";
 const path = ""; // default path is db/db.json
 const orm = new SnapJson(path);
 const usersCollection = await orm.collection<UserSchema>("user");
+
+const usersCollection = await orm.collection<UserSchema>("user", true); // create collection 'user' when it doesn't exist.
 ```
 
 This will return an instance of this collection if it exists, otherwise, an error will be thrown.
@@ -148,6 +150,8 @@ This will return an instance of this collection if it exists, otherwise, an erro
 import { defineCollection } from "snapjson";
 const path = ""; // default path is db/db.json
 const usersCollection = await defineCollection<UserSchema>("user", path);
+
+const usersCollection = await defineCollection<UserSchema>("user", path, true); // create collection 'user' when it doesn't exist.
 ```
 
 #### Method 3: Using the Collection Class
@@ -377,7 +381,7 @@ console.log(orm.pathDB); // db/db.json
   - removeAllUniqueKeys
   - count
   - size
-  - lastIdInsert
+  - lastInsertId
   - add
   - create
 */
@@ -411,8 +415,8 @@ await usersCollection.count({ age: { $lte: 30 } });
 const collectionSize = await usersCollection.size();
 console.log(collectionSize); // 26 KB
 
-// lastIdInsert
-const id = await usersCollection.lastIdInsert();
+// lastInsertId
+const id = await usersCollection.lastInsertId();
 console.log(id); // 3
 
 // add and create methods are aliases for insertOne method
@@ -667,7 +671,7 @@ await studentsCollection.find({ age: { $in: [20, 30, 40] } });
 
 ### $nin Operator
 
-In this example, we retrieve the documents where the age field do not contain the given values.
+In this example, we retrieve the documents where the age field doesn't contain the given values.
 
 ```typescript
 await studentsCollection.find({ age: { $nin: [20, 30, 40] } });
@@ -874,7 +878,7 @@ await shoesCollection.find({ colors: { $contains: ["black", "white"] } });
 
 ### $nocontains operator
 
-In this example, we retrieve the documents where the colors field do not contain white and black colors at once..
+In this example, we retrieve the documents where the colors field doesn't contain white and black colors at once..
 
 ```typescript
 await shoesCollection.find({ colors: { $nocontains: ["black", "white"] } });

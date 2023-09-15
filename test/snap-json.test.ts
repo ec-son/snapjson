@@ -35,7 +35,7 @@ const db: DataBaseType = {
   ] as MetadataType<{ fullname: string; email: string; age: number }>[],
 };
 
-mockLoadData.mockResolvedValue(db);
+mockLoadData.mockResolvedValue(structuredClone(db));
 mockSaveData.mockResolvedValue(void 0);
 
 /***
@@ -102,6 +102,16 @@ describe("Collection", () => {
   it("should create a new collection instance", async () => {
     const expected = new Collection("user", path_db);
     await expect(orm.collection("user")).resolves.toEqual(expected);
+  });
+
+  it("should create a new collection instance", async () => {
+    mockLoadData.mockResolvedValueOnce(structuredClone(db));
+    const expected = new Collection("user1", path_db);
+    await expect(orm.collection("user1", true)).resolves.toEqual(expected);
+  });
+
+  it("should throw an error when collection doesn't exist", async () => {
+    await expect(orm.collection("user2")).rejects.toThrow();
   });
 
   /**
@@ -342,6 +352,18 @@ describe("management collection with helper function", () => {
   it("should create a new collection instance", async () => {
     const expected = new Collection("user", path_db);
     await expect(defineCollection("user", path_db)).resolves.toEqual(expected);
+  });
+
+  it("should create a new collection instance", async () => {
+    mockLoadData.mockResolvedValueOnce(structuredClone(db));
+    const expected = new Collection("user1", path_db);
+    await expect(defineCollection("user1", path_db, true)).resolves.toEqual(
+      expected
+    );
+  });
+
+  it("should throw an error when collection doesn't exist", async () => {
+    await expect(defineCollection("user2", path_db)).rejects.toThrow();
   });
 
   const table1 = ["collection", ["collection1", "collection2"]];

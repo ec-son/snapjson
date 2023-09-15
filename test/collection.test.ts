@@ -76,7 +76,7 @@ mockSaveData.mockResolvedValue(void 0);
 /**
  * Collection class
  *
- * lastIdInsert
+ * lastInsertId
  * size
  *
  * findById
@@ -127,7 +127,7 @@ describe("collection instance", () => {
   const table1 = [undefined, "", "collectionNotFound"];
 
   it.each(table1)(
-    "throw an error when collection do not exist",
+    "throw an error when collection doesn't exist",
     async (collectionName) => {
       const collection = new Collection(collectionName as string, path_db);
       await expect(collection.count()).rejects.toThrow();
@@ -146,7 +146,7 @@ describe("collection instance", () => {
 
 describe("tools methods of collection", () => {
   it("should return a last id", async () => {
-    await expect(user.lastIdInsert()).resolves.toBe(5);
+    await expect(user.lastInsertId()).resolves.toBe(5);
   });
 
   it("should return path of database", async () => {
@@ -289,7 +289,7 @@ describe("inserting documents into database", () => {
 
   it.each(table1)("should return created document", async (document) => {
     await expect(user.insertOne(document)).resolves.toEqual(
-      factoryDocument({ ...document, __id: (await user.lastIdInsert()) + 1 })
+      factoryDocument({ ...document, __id: (await user.lastInsertId()) + 1 })
     );
   });
 
@@ -303,7 +303,7 @@ describe("inserting documents into database", () => {
     await user[method](document);
     expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual({
       ...document,
-      __id: await user.lastIdInsert(),
+      __id: await user.lastInsertId(),
     });
   });
 
@@ -323,7 +323,7 @@ describe("inserting documents into database", () => {
   });
 
   it("should insert multiple entities", async () => {
-    let __id = await user.lastIdInsert();
+    let __id = await user.lastInsertId();
     const items: Pick<userType, Exclude<keyof userType, "__id">>[] = [
       { firstName: "item7", email: "item7@example.com" },
       { firstName: "item8", email: "item8@example.com", age: 36 },
