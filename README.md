@@ -138,6 +138,8 @@ import { SnapJson } from "snapjson";
 const path = ""; // default path is db/db.json
 const orm = new SnapJson(path);
 const usersCollection = await orm.collection<UserSchema>("user");
+
+const usersCollection = await orm.collection<UserSchema>("user", true); // create collection 'user' when it doesn't exist.
 ```
 
 This will return an instance of this collection if it exists, otherwise, an error will be thrown.
@@ -148,6 +150,8 @@ This will return an instance of this collection if it exists, otherwise, an erro
 import { defineCollection } from "snapjson";
 const path = ""; // default path is db/db.json
 const usersCollection = await defineCollection<UserSchema>("user", path);
+
+const usersCollection = await defineCollection<UserSchema>("user", path, true); // create collection 'user' when it doesn't exist.
 ```
 
 #### Method 3: Using the Collection Class
