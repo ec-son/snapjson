@@ -1,24 +1,25 @@
-import { dirname } from "path";
-import { Document } from "../lib/document";
-import { open, readFile, stat, mkdir } from "node:fs/promises";
-import { DataBaseType } from "../types/orm.type";
-import { DocumentDataType } from "../types/document-data.type";
+import { join } from "path";
+import { stat, rm } from "node:fs/promises";
+import { CollectionInfoType, DatabaseInfoOptionType } from "../types/orm.type";
+import { decrypt, encrypt } from "./cryptoUtil";
+import { loadData } from "./load-data";
 
-/**
- * Loads data from database file.
- * @param path_db path to the database file.
- * @returns Returns data.
- */
-async function loadData(path_db: string): Promise<DataBaseType> {
-  let data = "";
-  try {
-    data = await readFile(path_db, { encoding: "utf-8" });
-    if (!data || /^\s+$/.test(data)) return {};
-  } catch (error: any) {
-    if (error.code !== "ENOENT") throw error;
-    return {};
-  }
+export async function encodeData(
+  data: any,
+  opt: DatabaseInfoOptionType
+): Promise<string> {
+  if (opt.encrypted)
+    return encrypt(JSON.stringify(data), opt.secretKey, opt.salt);
+  else
+    return opt.mode === "dev"
+      ? JSON.stringify(data, null, 2)
+      : JSON.stringify(data);
+}
 
+export async function decodeData(
+  data: any,
+  opt: DatabaseInfoOptionType
+): Promise<any> {
   const reviver = (key: string, value: string) => {
     const dateRegex = new RegExp(
       "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}",
@@ -29,34 +30,33 @@ async function loadData(path_db: string): Promise<DataBaseType> {
     }
     return value;
   };
-  try {
+
+  if (opt.encrypted) {
+    if (data.startsWith("enc::"))
+      return JSON.parse(decrypt(data, opt.secretKey, opt.salt), reviver);
     return JSON.parse(data, reviver);
-  } catch (error: any) {
-    throw new Error(`Can't Load Database: ${error.message}`);
+  } else {
+    if (data.startsWith("enc::"))
+      throw new Error(
+        "Decryption error: the data appears to be encrypted but 'encrypted' option is false. Set 'ecrypted: true' to decrypt properly."
+      );
+    return JSON.parse(data, reviver);
   }
 }
 
-/**
- * Saves data to the database.
- * @param path_db path to the database file.
- * @param data data to save to the database.
- */
-async function saveData(path_db: string, data: DataBaseType) {
-  let fd = null;
-  try {
-    if (!data) data = {};
-    fd = await open(path_db, "w");
-  } catch (error: any) {
-    if (error.code !== "ENOENT") throw error;
-    const basepath = dirname(path_db);
-    await mkdir(basepath, { recursive: true });
-    fd = await open(path_db, "w");
-  }
-  try {
-    await fd.writeFile(JSON.stringify(data, null, 2), { encoding: "utf-8" });
-  } finally {
-    if (fd) await fd.close();
-  }
+export function getPath(opt: DatabaseInfoOptionType): string {
+  let path_db = "";
+  if (opt.splitFile) {
+    if (opt.flag === "orm-info" || opt.flag === "collection-info")
+      path_db = join(opt.path_db, "__metadata__.json");
+    else path_db = join(opt.path_db, opt.flag + ".json");
+  } else path_db = join(opt.path_db, "db.json");
+
+  return path_db;
+}
+
+export async function removeFile(path: string) {
+  await rm(path);
 }
 
 /**
@@ -64,11 +64,37 @@ async function saveData(path_db: string, data: DataBaseType) {
  * @param path_db path to the database file.
  * @returns Returns size of the database file.
  */
-async function sizeFile(path_db: string): Promise<string> {
+async function sizeFile(opt?: DatabaseInfoOptionType): Promise<string> {
+  if (!opt) {
+    opt = {
+      path_db: "db",
+      flag: "orm-info",
+      splitFile: false,
+    };
+  } else opt.flag = "orm-info";
+
   try {
-    if (!path_db) throw new Error(`Unable to find database file`);
-    const statFile = await stat(path_db);
-    return formatSize(statFile.size);
+    if (!opt.splitFile) {
+      const path_db = getPath(opt);
+      const statFile = await stat(path_db);
+      return formatSize(statFile.size);
+    }
+
+    const collectionTab = (
+      (await loadData({
+        ...opt,
+        flag: "collection-info",
+      })) as CollectionInfoType[]
+    ).map((el) => el.collectionName);
+    let size = (await stat(getPath(opt))).size;
+
+    for (const collectionName of collectionTab) {
+      try {
+        size += (await stat(getPath({ ...opt, flag: collectionName }))).size;
+      } catch (error) {}
+    }
+
+    return formatSize(size);
   } catch (error: any) {
     if (error.code === "ENOENT") {
       return "0 B";
@@ -86,35 +112,6 @@ function convertToObject(tab: string | Array<string>, _obj?: {}) {
   });
 
   return obj;
-}
-
-/**
- * Creates instance of document.
- * @param documents one document or array of documents.
- * @param path_id path to the database file.
- * @param collectionName name of the collection.
- * @returns Returns instance of document or an array of documents.
- */
-function defineDocument<T extends Object>(
-  documents: T | T[],
-  path_id: string,
-  collectionName: string
-): DocumentDataType<T> | Array<DocumentDataType<T>> {
-  if (!Array.isArray(documents))
-    return new Document<T>(
-      structuredClone(documents),
-      path_id,
-      collectionName
-    ) as unknown as DocumentDataType<T>;
-  else
-    return documents.map(
-      (el) =>
-        new Document<T>(
-          structuredClone(el),
-          path_id,
-          collectionName
-        ) as unknown as DocumentDataType<T>
-    );
 }
 
 /**
@@ -199,13 +196,4 @@ function compare(
   return false;
 }
 
-export {
-  loadData,
-  saveData,
-  sizeFile,
-  convertToObject,
-  defineDocument,
-  formatSize,
-  isEqual,
-  compare,
-};
+export { sizeFile, convertToObject, formatSize, isEqual, compare };

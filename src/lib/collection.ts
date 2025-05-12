@@ -1,33 +1,61 @@
+import { loadData } from "../utils/load-data";
 import { DocumentDataType } from "../types/document-data.type";
 import {
+  CollectionInfoType,
   CollectionType,
-  DataBaseType,
-  MetadataType,
+  DatabaseInfoOptionType,
+  OrmInfoType,
   QueryOneOptionType,
   QueryOptionType,
   QueryType,
 } from "../types/orm.type";
-import {
-  defineDocument,
-  formatSize,
-  loadData,
-  saveData,
-} from "../utils/utils.func";
+import { formatSize } from "../utils/utils.func";
 import { Query } from "./query";
+import { SnapJson } from "./snapjson";
+import { saveData } from "../utils/save-data";
+import { defineDocument } from "../utils/shortcutFunc";
 
 export class Collection<
   T extends Object,
   U extends T & { readonly __id: number } = { readonly __id: number } & T
 > {
-  private _pathDB: string;
-  private metadata: MetadataType<T>;
+  private _opt: DatabaseInfoOptionType = {
+    path_db: "db",
+    mode: "dev",
+    splitFile: false,
+    flag: "",
+  };
+  // private collectionInfo: CollectionInfoType;
 
   constructor(
     private readonly _collectionName: string,
-    private readonly path?: string
+    opt?:
+      | Partial<
+          Pick<
+            DatabaseInfoOptionType,
+            Exclude<keyof DatabaseInfoOptionType, "flag">
+          >
+        >
+      | undefined
   ) {
-    this._pathDB = path || "db/db.json";
-    this.metadata = { collectionName: _collectionName, unique: [] };
+    if ("__metadata__" === _collectionName)
+      throw new Error("Connot create collection with '__metadata__' name.");
+
+    // this.collectionInfo = { collectionName: _collectionName, unique: [] };
+    if (opt) {
+      this._opt.path_db = opt.path_db;
+      this._opt.mode = opt.mode;
+      this._opt.splitFile = opt.splitFile;
+      this._opt.encrypted = opt.encrypted;
+      // if (opt.encrypted) throw new Error("errrrrrr"); //todo message here od english
+      this._opt.secretKey = opt.secretKey;
+      this._opt.salt = opt.salt;
+    }
+    this._opt.flag = _collectionName;
+
+    const orm = new SnapJson({ ...this._opt });
+    if (!orm.isExistCollection(this._collectionName))
+      throw new Error(`Collection '${this._collectionName}' doesn't exist.`);
   }
 
   //SELECT
@@ -98,15 +126,17 @@ export class Collection<
     query: QueryType<any>,
     opts?: QueryOptionType<any>
   ): Promise<DocumentDataType<any> | Array<DocumentDataType<any>> | undefined> {
-    const collectionDB = await this.loadCollectionData();
+    const collectionData = (await this.loadData(
+      this._collectionName
+    )) as CollectionType<any>;
     const queryInstance = new Query(
       query,
-      structuredClone(collectionDB),
+      structuredClone(collectionData),
       opts as any
     );
     const result = queryInstance.getData();
     if (!result) return undefined;
-    return defineDocument(result, this.pathDB, this._collectionName) as Array<
+    return defineDocument(result, this._collectionName, this._opt) as Array<
       DocumentDataType<any>
     >;
   }
@@ -134,26 +164,28 @@ export class Collection<
   ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>>> {
     const isArray = Array.isArray(data);
     if (!Array.isArray(data)) data = [data];
-    const collectionDB = await this.loadCollectionData();
+    const collectionData = (await this.loadData(
+      this._collectionName
+    )) as CollectionType<any>;
     const tab: U[] = [];
     for (const key in data) {
       const element = data[key];
-      const __id = (await this._lastInsertId(collectionDB)) + 1;
+      const __id = (await this._lastInsertId(collectionData)) + 1;
 
-      await this.constrain(element, collectionDB);
+      await this.constrain(element, collectionData);
       tab.push({ ...element, __id } as U);
-      collectionDB.push({ ...element, __id } as U);
+      collectionData.push({ ...element, __id } as U);
     }
 
-    await this.saveData(collectionDB);
+    await this.saveData(collectionData);
     return isArray
-      ? (defineDocument(tab, this.pathDB, this._collectionName) as Array<
+      ? (defineDocument(tab, this._collectionName, this._opt) as Array<
           DocumentDataType<U>
         >)
       : (defineDocument(
           tab[0],
-          this.pathDB,
-          this._collectionName
+          this._collectionName,
+          this._opt
         ) as DocumentDataType<U>);
   }
 
@@ -180,8 +212,10 @@ export class Collection<
     query: QueryType<Partial<U>>,
     isMany?: boolean
   ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>> | null> {
-    const collectionDB = await this.loadCollectionData();
-    const queryInstance = new Query(query, structuredClone(collectionDB));
+    const collectionData = (await this.loadData(
+      this._collectionName
+    )) as CollectionType<any>;
+    const queryInstance = new Query(query, structuredClone(collectionData));
     let result = queryInstance.getData() as CollectionType<U>;
 
     if (result.length === 0) return null;
@@ -189,8 +223,8 @@ export class Collection<
 
     const updated = [];
 
-    for (const index in collectionDB) {
-      const document = collectionDB[index];
+    for (const index in collectionData) {
+      const document = collectionData[index];
       const t = result.find((el) => el.__id === document.__id);
       if (!t) continue;
       if ("__id" in data) {
@@ -198,21 +232,21 @@ export class Collection<
         data = rest as any;
       }
 
-      await this.constrain(data, collectionDB, document.__id);
-      collectionDB[index] = { ...t, ...data };
-      updated.push(collectionDB[index]);
+      await this.constrain(data, collectionData, document.__id);
+      collectionData[index] = { ...t, ...data };
+      updated.push(collectionData[index]);
       if (result.length === 1) break;
     }
 
-    await this.saveData(collectionDB);
+    await this.saveData(collectionData);
     return isMany
-      ? (defineDocument(updated, this.pathDB, this._collectionName) as Array<
+      ? (defineDocument(updated, this._collectionName, this._opt) as Array<
           DocumentDataType<U>
         >)
       : (defineDocument(
           updated[0],
-          this.pathDB,
-          this._collectionName
+          this._collectionName,
+          this._opt
         ) as DocumentDataType<U>);
   }
 
@@ -234,41 +268,47 @@ export class Collection<
     query: QueryType<Partial<U>>,
     isMany?: boolean
   ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>> | null> {
-    const collectionDB = await this.loadCollectionData();
-    const queryInstance = new Query(query, structuredClone(collectionDB));
+    const collectionData = (await this.loadData(
+      this._collectionName
+    )) as CollectionType<any>;
+    const queryInstance = new Query(query, structuredClone(collectionData));
     const result = queryInstance.getData() as CollectionType<U>;
 
     const resultOfDeleted: U[] = [];
     if (result.length === 0) return null;
     for (const key in result) {
       const element = result[key];
-      const index = collectionDB.findIndex((el) => el.__id === element.__id);
-      resultOfDeleted.push(...collectionDB.splice(index, 1));
+      const index = collectionData.findIndex((el) => el.__id === element.__id);
+      resultOfDeleted.push(...collectionData.splice(index, 1));
       if (!isMany) {
-        await this.saveData(collectionDB);
+        await this.saveData(collectionData);
         return defineDocument(
           resultOfDeleted[0],
-          this.pathDB,
-          this._collectionName
+          this._collectionName,
+          this._opt
         ) as DocumentDataType<U>;
       }
     }
 
-    await this.saveData(collectionDB);
+    await this.saveData(collectionData);
     return defineDocument(
       resultOfDeleted,
-      this.pathDB,
-      this._collectionName
+      this._collectionName,
+      this._opt
     ) as Array<DocumentDataType<U>>;
   }
 
   private async constrain(
     data: T | Partial<T>,
-    collectionDB: CollectionType<U>,
+    collectionData: CollectionType<U>,
     __id?: number
   ) {
-    this.metadata.unique?.forEach((key) => {
-      const t = collectionDB.find((el) => {
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
+
+    collectionInfo.unique?.forEach((key) => {
+      const t = collectionData.find((el) => {
         if (!el[key] && !data[key]) return false;
         return el[key] === data[key] && el.__id !== __id;
       });
@@ -288,11 +328,13 @@ export class Collection<
   }
 
   private async _lastInsertId(
-    collectionDB?: CollectionType<U>
+    collectionData?: CollectionType<U>
   ): Promise<number> {
-    collectionDB = collectionDB || (await this.loadCollectionData());
-    return collectionDB.length > 0
-      ? collectionDB[collectionDB.length - 1].__id
+    collectionData =
+      collectionData ||
+      ((await this.loadData(this._collectionName)) as CollectionType<any>);
+    return collectionData.length > 0
+      ? collectionData[collectionData.length - 1].__id
       : 0;
   }
 
@@ -305,16 +347,19 @@ export class Collection<
   async addUniqueKey(
     keyName: keyof T | Array<keyof T>
   ): Promise<typeof keyName> {
-    await this.loadCollectionData();
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
     const isArray = Array.isArray(keyName);
     let isAddedKey = false;
+
     if (!Array.isArray(keyName)) keyName = [keyName];
-    for (const iterator of keyName) {
-      if (this.metadata.unique.includes(iterator)) continue;
-      this.metadata.unique.push(iterator);
+    for (const iterator of keyName as Array<string>) {
+      if (collectionInfo.unique.includes(iterator)) continue;
+      collectionInfo.unique.push(iterator);
       isAddedKey = true;
     }
-    if (isAddedKey) await this.saveMetadata();
+    if (isAddedKey) await this.saveData(collectionInfo, "collection-info");
     return isArray ? keyName : keyName[0];
   }
 
@@ -326,18 +371,23 @@ export class Collection<
   async removeUniqueKey(
     uniqueKey: keyof T | Array<keyof T>
   ): Promise<typeof uniqueKey | undefined> {
-    await this.loadCollectionData();
-
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
     const isArray = Array.isArray(uniqueKey);
+
     if (!Array.isArray(uniqueKey)) uniqueKey = [uniqueKey];
     const savedKeyName: Array<keyof T> = [];
+
     for (const iterator of uniqueKey) {
-      const index = this.metadata.unique.findIndex((el) => el === iterator);
+      const index = collectionInfo.unique.findIndex((el) => el === iterator);
       if (index === -1) continue;
-      this.metadata.unique.splice(index, 1);
+      collectionInfo.unique.splice(index, 1);
       savedKeyName.push(iterator);
     }
-    await this.saveMetadata();
+
+    if (savedKeyName.length > 0)
+      await this.saveData(collectionInfo, "collection-info");
     return isArray ? savedKeyName : savedKeyName[0];
   }
 
@@ -345,19 +395,21 @@ export class Collection<
    * Removes all unique keys
    */
   async removeAllUniqueKeys(): Promise<Array<keyof T>> {
-    await this.loadCollectionData();
-    const keys = this.metadata.unique;
-    this.metadata.unique = [];
-    await this.saveMetadata();
-    return keys;
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
+    const keys = collectionInfo.unique;
+    collectionInfo.unique = [];
+    await this.saveData(collectionInfo, "collection-info");
+    return keys as Array<keyof T>;
   }
 
   /**
    * Returns all unique keys.
    */
   async getUniqueKeys(): Promise<Array<keyof T>> {
-    await this.loadCollectionData();
-    return this.metadata.unique;
+    return ((await this.loadData("collection-info")) as CollectionInfoType)
+      .unique as Array<keyof T>;
   }
 
   get collectionName(): string {
@@ -365,7 +417,7 @@ export class Collection<
   }
 
   get pathDB(): string {
-    return this._pathDB;
+    return this._opt.path_db;
   }
 
   /**
@@ -376,7 +428,7 @@ export class Collection<
    * Returns size of this collection.
    */
   async size(): Promise<string> {
-    const collectionString = JSON.stringify(await this.loadCollectionData());
+    const collectionString = JSON.stringify(await this.loadData());
     const blob = new Blob([collectionString]);
     return formatSize(blob.size);
   }
@@ -385,54 +437,48 @@ export class Collection<
    * Counts documents in this collection.
    */
   async count(query?: QueryType<Partial<U>>) {
-    if (!query) return (await this.loadCollectionData()).length;
+    if (!query) return ((await this.loadData()) as CollectionType<any>).length;
 
     const data = await this.find(query);
     return data.length;
   }
 
-  private async loadCollectionData(
-    load: boolean = true
-  ): Promise<CollectionType<U>> {
-    const db = await this.loadData();
-    if (load) {
-      this.loadDataLocally(db);
-    }
-    return db[this._collectionName] as CollectionType<U>;
+  private async saveData(
+    data: CollectionInfoType | CollectionType<U>,
+    flag?: string
+  ) {
+    if (!flag) flag = this._collectionName;
+    if (flag === "collection-info") {
+      const collectionInfo = (await loadData({
+        ...this._opt,
+        flag,
+      })) as CollectionInfoType[];
+      const findIndex = collectionInfo.findIndex(
+        (el) => el.collectionName === this._collectionName
+      );
+
+      if (findIndex === -1) collectionInfo.push(data as CollectionInfoType);
+      else collectionInfo[findIndex] = data as CollectionInfoType;
+      await saveData(collectionInfo as CollectionType<any>, {
+        ...this._opt,
+        flag,
+      });
+    } else await saveData(data as CollectionType<any>, { ...this._opt, flag });
   }
 
-  private loadDataLocally(db: DataBaseType) {
-    this.metadata =
-      ((db["__metadata__"] as Array<MetadataType<{}>>).find(
-        (collection) => collection.collectionName === this._collectionName
-      ) as MetadataType<T>) || this.metadata;
-  }
-
-  private async saveData(data: CollectionType<U>) {
-    const db = await this.loadData();
-    db[this._collectionName] = data as Record<string, any>[];
-    await saveData(this._pathDB, db);
-  }
-
-  private async loadData(): Promise<DataBaseType> {
-    if (!this._collectionName || this._collectionName === "__metadata__")
-      throw new Error(`Collection '${this._collectionName}' doesn't exist.`);
-    const db = await loadData(this._pathDB);
-    if (!(this._collectionName in db))
-      throw new Error(`Collection '${this._collectionName}' doesn't exist.`);
-    return db;
-  }
-
-  private async saveMetadata() {
-    const db = await this.loadData();
-    const index = (db["__metadata__"] as Array<MetadataType<T>>).findIndex(
-      (metadata) => metadata.collectionName === this.collectionName
-    );
-
-    if (index === -1) return;
-
-    (db["__metadata__"] as Array<MetadataType<T>>)[index].unique =
-      this.metadata.unique;
-    await saveData(this._pathDB, db);
+  private async loadData(
+    flag?: string
+  ): Promise<OrmInfoType | CollectionInfoType | CollectionType<T>> {
+    if (!flag) flag = this._collectionName;
+    if (flag === "collection-info")
+      return (
+        ((await loadData({ ...this._opt, flag })) as CollectionInfoType[]).find(
+          (collectionInfo) =>
+            collectionInfo.collectionName === this._collectionName
+        ) || { collectionName: this._collectionName, unique: [] }
+      );
+    return (await loadData({ ...this._opt, flag })) as
+      | OrmInfoType
+      | CollectionType<T>;
   }
 }

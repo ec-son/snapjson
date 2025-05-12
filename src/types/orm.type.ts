@@ -57,7 +57,10 @@ type AndOp<T> = Array<QueryType<T>>;
 
 type QueryType<T> = { $and?: AndOp<T>; $or?: OrOp<T> } & PropOp<T>;
 
-type MetadataType<T> = { collectionName: string; unique: Array<keyof T> };
+type MetadataType = {
+  databaseInfo: { splitFile: boolean };
+  collectionInfo: Array<{ collectionName: string; unique: Array<string> }>;
+};
 
 type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
   ? {
@@ -99,9 +102,39 @@ interface DataBaseType {
   [key: string]: Array<Record<string, any>>;
 }
 
+type OrmInfoType = { splitFile: boolean };
+
+type CollectionInfoType = {
+  collectionName: string;
+  unique: Array<string>;
+};
+
 type CollectionType<T> = Array<T>;
 
+type DatabaseInfoOptionType = {
+  path_db: string;
+  splitFile: boolean; // Each collection is stored in its own file
+  flag: string;
+  encrypted?: boolean; // Each collection is encrypted
+  secretKey?: string;
+  salt?: string;
+  // algorithm?:
+  //   | "aes-128-ccm"
+  //   | "aes-128-gcm"
+  //   | "aes-128-ocb"
+  //   | "aes-192-ccm"
+  //   | "aes-192-gcm"
+  //   | "aes-192-ocb"
+  //   | "aes-256-ccm"
+  //   | "aes-256-gcm"
+  //   | "aes-256-ocb"
+  //   | "chacha20-poly1305";
+  mode?: "dev" | "prod";
+};
+
 export {
+  OrmInfoType,
+  CollectionInfoType,
   OperatorOp,
   PropOp,
   QueryType,
@@ -110,4 +143,5 @@ export {
   QueryOneOptionType,
   CollectionType,
   DataBaseType,
+  DatabaseInfoOptionType,
 };

@@ -1,5 +1,5 @@
 import { Document } from "../src/lib/document";
-import * as createCollection from "../src/lib/snapjson";
+import * as shortcutFunc from "../src/utils/shortcutFunc";
 
 /**
  * toObject
@@ -13,12 +13,8 @@ const obj = {
   name: "test",
   age: 17,
 };
-const user = new Document<typeof obj>(obj, "db", "user") as Document<
-  typeof obj
-> &
-  typeof obj;
 
-const mockCreateCollection = jest.spyOn(createCollection, "defineCollection");
+const mockCreateCollection = jest.spyOn(shortcutFunc, "defineCollection");
 const mockUpdateOne = jest.fn((document) => document);
 const mockDeleteOne = jest.fn((document) => document);
 
@@ -26,6 +22,10 @@ mockCreateCollection.mockResolvedValue({
   updateOne: mockUpdateOne,
   deleteOne: mockDeleteOne,
 } as any);
+
+const user = new Document<typeof obj>(obj, "student", {
+  path_db: "assd",
+}) as Document<typeof obj> & typeof obj;
 
 describe("creating document", () => {
   it("should return properties of document", () => {
