@@ -1,14 +1,38 @@
 import { Collection } from "./collection";
-import { loadData, saveData, sizeFile } from "../utils/utils.func";
-import { DataBaseType, MetadataType } from "../types/orm.type";
+import { removeFile, sizeFile } from "../utils/utils.func";
+import {
+  CollectionInfoType,
+  CollectionType,
+  DatabaseInfoOptionType,
+  OrmInfoType,
+} from "../types/orm.type";
+import { loadData } from "../utils/load-data";
+import { saveData } from "../utils/save-data";
+import { join } from "path";
 
 export class SnapJson {
-  private _pathDB: string;
-  private _collection: string[] = [];
-  private metadata: Array<MetadataType<Record<string, any>>> = [];
+  private _opt: Pick<
+    DatabaseInfoOptionType,
+    Exclude<keyof DatabaseInfoOptionType, "flag">
+  > = { path_db: "db", mode: "dev", splitFile: false };
 
-  constructor(path?: string) {
-    this._pathDB = path || "db/db.json";
+  constructor(
+    opt?: Partial<
+      Pick<
+        DatabaseInfoOptionType,
+        Exclude<keyof DatabaseInfoOptionType, "flag">
+      >
+    >
+  ) {
+    if (opt) {
+      this._opt.path_db = opt.path_db || "db";
+      this._opt.mode = opt.mode || "dev";
+      this._opt.splitFile = opt.splitFile || false;
+      this._opt.encrypted = opt.encrypted || false;
+      // if (opt.encrypted) throw new Error("errrrrrr"); //todo message here od english
+      this._opt.secretKey = opt.secretKey;
+      this._opt.salt = opt.salt;
+    }
   }
 
   /**
@@ -57,13 +81,16 @@ export class SnapJson {
     collections: any,
     force?: boolean
   ): Promise<Collection<T> | Collection<T>[]> {
-    const db = await this.loadData();
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+    const existedCollection = await this.getCollections(collectionInfo);
+
     const isArray = Array.isArray(collections);
     const collectionsTab: string[] = [];
     if (!Array.isArray(collections)) collections = [collections];
-    if (!db["__metadata__"]) db["__metadata__"] = [];
 
-    collections.forEach((collection: any) => {
+    for (const collection of collections) {
       let name: string = "";
       let unique: string[] = [];
 
@@ -78,27 +105,24 @@ export class SnapJson {
       if ("__metadata__" === name)
         throw new Error(`Connot create collection with '${name}' name.`);
 
-      if (this._collection.includes(name) && !force)
+      if (existedCollection.includes(name) && !force)
         throw new Error(`Collection '${name}' already exists.`);
-      else if (this._collection.includes(name)) {
-        const index = (
-          db["__metadata__"] as Array<MetadataType<Record<string, any>>>
-        ).findIndex((el) => el.collectionName === name);
-        if (index !== -1) db["__metadata__"].splice(index, 1);
+      else if (existedCollection.includes(name)) {
+        collectionInfo = collectionInfo.filter(
+          (el) => el.collectionName !== name
+        );
+        await saveData([], { ...this._opt, flag: name });
       }
 
-      db[name] = [];
-      (db["__metadata__"] as Array<MetadataType<Record<string, any>>>).push({
+      collectionInfo.push({
         collectionName: name,
         unique,
       });
       collectionsTab.push(name);
-    });
-
-    if (collectionsTab.length > 0) {
-      this.loadDataLocally(db);
-      await this.saveData(db);
     }
+
+    if (collectionsTab.length > 0)
+      await this.saveData(collectionInfo, "collection-info");
 
     if (!isArray) return this.collection<T>(collectionsTab[0]);
     const col: Collection<T>[] = [];
@@ -111,44 +135,48 @@ export class SnapJson {
 
   /**
    * Removes one or many collections.
-   * @param {string | string[]} collections Name of collection to be removed. It can be either a string for single collection or an array of string for multiple collections.
+   * @param {string | string[]} collectionNames Name of collection to be removed. It can be either a string for single collection or an array of string for multiple collections.
    * @param force [force=false] If true, collections found with data will be removed.
    * @returns The collections(e) that have been removed.
    */
   async removeCollection(
-    collections: string | string[],
+    collectionNames: string | string[],
     force: boolean = false
-  ): Promise<typeof collections | undefined> {
-    const db = await this.loadData();
-    const isArray = Array.isArray(collections);
-    if (!Array.isArray(collections)) collections = [collections];
-    const collectionsTab: string[] = [];
-    collections.forEach((collection) => {
-      if (
-        !this._collection.includes(collection) ||
-        collection === "__metadata__"
-      )
-        return;
-      if (db[collection].length > 0 && !force)
-        throw new Error(
-          `Cannot remove collection '${collection}' from database. Please try again with force argument.`
-        );
-      collectionsTab.push(collection);
-      delete db[collection];
-      const index = (
-        db["__metadata__"] as Array<MetadataType<Record<string, any>>>
-      ).findIndex((el) => el.collectionName === collection);
-      if (index !== -1)
-        (db["__metadata__"] as Array<MetadataType<Record<string, any>>>).splice(
-          index,
-          1
-        );
-    });
+  ): Promise<typeof collectionNames | undefined> {
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+    const existedCollection = collectionInfo.map(
+      (collection) => collection.collectionName
+    );
 
-    if (collectionsTab.length > 0) {
-      this.loadDataLocally(db);
-      await this.saveData(db);
+    const isArray = Array.isArray(collectionNames);
+
+    if (!Array.isArray(collectionNames)) collectionNames = [collectionNames];
+    const collectionsTab: string[] = [];
+    for await (const collectionName of collectionNames) {
+      if (!existedCollection.includes(collectionName)) return;
+
+      const collectionData = (await loadData({
+        ...this._opt,
+        flag: collectionName,
+      })) as CollectionType<any>;
+      if (collectionData.length > 0 && !force)
+        throw new Error(
+          `Cannot remove collection '${collectionName}' from database. Please try again with force argument.`
+        );
+
+      collectionsTab.push(collectionName);
+      removeFile(join(this._opt.path_db, collectionName));
+      const index = collectionInfo.findIndex(
+        (collection) => collection.collectionName === collectionName
+      );
+      if (index !== -1) collectionInfo.splice(index, 1);
     }
+
+    if (collectionsTab.length > 0)
+      await this.saveData(collectionInfo, "collection-info");
+
     return isArray ? collectionsTab : collectionsTab[0];
   }
 
@@ -168,15 +196,20 @@ export class SnapJson {
         throw new Error(`Collection '${collectionName}' doesn't exist.`);
       return this.createCollection(collectionName);
     }
-    return new Collection<T>(collectionName, this._pathDB);
+    return new Collection<T>(collectionName, this._opt);
   }
 
   /**
    *  Returns an array of collection names
    */
-  async getCollections(): Promise<string[]> {
-    if (this._collection.length === 0) await this.loadData();
-    return this._collection;
+  async getCollections(
+    collectionInfo?: CollectionInfoType[]
+  ): Promise<string[]> {
+    if (!collectionInfo)
+      collectionInfo = (await this.loadData(
+        "collection-info"
+      )) as CollectionInfoType[];
+    return collectionInfo.map((collection) => collection.collectionName);
   }
 
   /**
@@ -196,9 +229,7 @@ export class SnapJson {
    * }
    */
   async isExistCollection(collection: string): Promise<boolean> {
-    if (!collection && collection === "__metadata__") return false;
-    if (this._collection.length === 0) await this.loadData();
-    return this._collection.includes(collection);
+    return (await this.getCollections()).includes(collection);
   }
 
   /**
@@ -209,99 +240,25 @@ export class SnapJson {
    * Returns size of the database
    */
   async size(): Promise<string> {
-    return sizeFile(this.pathDB);
+    return sizeFile({ ...this._opt, flag: "orm-info" });
   }
 
   get pathDB(): string {
-    return this._pathDB;
+    return this._opt.path_db;
   }
 
-  private async loadData(load: boolean = true): Promise<DataBaseType> {
-    const db = await loadData(this._pathDB);
-    if (load) {
-      this.loadDataLocally(db);
-    }
-    return db;
+  private async loadData(
+    flag: "orm-info" | "collection-info"
+  ): Promise<OrmInfoType | CollectionInfoType[]> {
+    return (await loadData({ ...this._opt, flag })) as
+      | OrmInfoType
+      | CollectionInfoType[];
   }
 
-  private loadDataLocally(db: DataBaseType) {
-    this._collection = Object.keys(db);
-    const findIndex = this._collection.findIndex(
-      (collectionName) => collectionName === "__metadata__"
-    );
-    if (findIndex !== -1) this._collection.splice(findIndex, 1);
-    this.metadata =
-      (db["__metadata__"] as Array<MetadataType<Record<string, any>>>) || [];
+  private async saveData(
+    data: OrmInfoType | CollectionInfoType[],
+    flag: "orm-info" | "collection-info"
+  ) {
+    await saveData(data, { ...this._opt, flag });
   }
-
-  private async saveData(data: DataBaseType) {
-    await saveData(this._pathDB, data);
-  }
-}
-
-/**
- * Returns instance of collection
- * @param collectionName Name of collection
- * @param path Path of database file
- * @param {boolean} force [force=false] Create collection when it doesn't exist.
- * @returns Instance of the specified collection if found.
- * @throws If the collection is not found, an error will be thrown.
- */
-export async function defineCollection<T extends Object>(
-  collectionName: string,
-  path?: string,
-  force: boolean = false
-): Promise<Collection<T>> {
-  const orm = new SnapJson(path);
-  return orm.collection(collectionName, force);
-}
-
-/**
- * Creates a new collection.
- * @param {string | { name: string; uniqueKeys?: Array<keyof T> }} collection The name of the collection or an object with the following properties:
- *  - name The name of the collection.
- *  - uniqueKeys An array containing all unique keys in this collection.
- * @param path Path of database file
- * @param force [force=false] If true, existing collection with the same name will be overwritten.
- * @returns Collection instance(s).
- */
-export async function createCollection<T extends Object>(
-  collection: string | { collectionName: string; uniqueKeys?: Array<keyof T> },
-  path?: string,
-  force?: boolean
-): Promise<Collection<T>>;
-
-export async function createCollection<T extends Object>(
-  collections:
-    | string[]
-    | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
-  path?: string,
-  force?: boolean
-): Promise<Collection<T>[]>;
-
-export async function createCollection<T extends Object>(
-  collections: any,
-  path?: string,
-  force?: boolean
-): Promise<Collection<T> | Collection<T>[]> {
-  const orm = new SnapJson(path);
-  if (Array.isArray(collections))
-    return orm.createCollections<T>(collections, force);
-  return orm.createCollection<T>(collections, force);
-}
-
-/**
- * Removes one or many collections.
- * @param {string | string[]} collections Name of collection to be removed. It can be either a string for single collection or an array of string for multiple collections.
- * @param path Path of database file
- * @param force [force=false] If true, collections found with data will be removed.
- * @returns The collections(e) that have been removed.
- */
-export async function removeCollection(
-  collections: string | string[],
-  path?: string,
-  force: boolean = false
-): Promise<typeof collections | undefined> {
-  const orm = new SnapJson(path);
-  return orm.removeCollection(collections, force);
 }
