@@ -2,6 +2,7 @@ import { defineCollection } from "../utils/shortcutFunc";
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
 import { DatabaseInfoOptionType } from "../types/orm.type";
+import { getOpts } from "../utils/opts.func";
 
 export class Document<T extends Object> {
   private id: number = -1;
@@ -26,7 +27,7 @@ export class Document<T extends Object> {
   constructor(
     private document: T,
     private collectionName: string,
-    opt?: Partial<
+    opt: Partial<
       Pick<
         DatabaseInfoOptionType,
         Exclude<keyof DatabaseInfoOptionType, "flag">
@@ -43,16 +44,7 @@ export class Document<T extends Object> {
       document = rest;
     }
 
-    if (opt) {
-      this._opt.path_db = opt.path_db;
-      this._opt.mode = opt.mode;
-      this._opt.splitFile = opt.splitFile;
-      this._opt.encrypted = opt.encrypted;
-      // if (opt.encrypted) throw new Error("errrrrrr"); //todo message here od english
-      this._opt.secretKey = opt.secretKey;
-      this._opt.salt = opt.salt;
-    }
-    this._opt.flag = collectionName;
+    this._opt = { ...(opt as any), flag: collectionName };
   }
 
   /**

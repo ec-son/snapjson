@@ -62,6 +62,13 @@ type MetadataType = {
   collectionInfo: Array<{ collectionName: string; unique: Array<string> }>;
 };
 
+type RelationQueryOptionType = {
+  collectionName: string;
+  limit?: number;
+  select?: string | string[];
+  match?: QueryType<Partial<any>>;
+};
+
 type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
   ? {
       limit?: number;
@@ -71,6 +78,12 @@ type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         flag?: "asc" | "desc";
       };
       offset?: number;
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     }
   : {
       limit?: number;
@@ -80,6 +93,12 @@ type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         flag?: "asc" | "desc";
       };
       offset?: number;
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     };
 
 type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
@@ -89,6 +108,12 @@ type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         property?: keyof T;
         flag?: "asc" | "desc";
       };
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     }
   : {
       select?: Array<keyof TSelect>;
@@ -96,6 +121,12 @@ type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         property?: keyof T;
         flag?: "asc" | "desc";
       };
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     };
 
 interface DataBaseType {
@@ -105,8 +136,27 @@ interface DataBaseType {
 type OrmInfoType = { splitFile: boolean };
 
 type CollectionInfoType = {
+  /**
+   * Name of the collection
+   */
   collectionName: string;
-  unique: Array<string>;
+  /**
+   * Choose between `"increment" (default) and `"uuid"`
+   */
+  idStrategy?: "uuid" | "increment";
+  /**
+   * Defines one or more unique key constraints for the collection.
+   */
+  unique?: Array<string>;
+  /**
+   * Enables automatic creation timestamp. Defaults to false
+   */
+  createdAt?: boolean;
+  /**
+   * Enables automatic update timestamp. Defaults to false
+   */
+  updatedAt?: boolean;
+  relations?: RelationType[];
 };
 
 type CollectionType<T> = Array<T>;
@@ -132,6 +182,69 @@ type DatabaseInfoOptionType = {
   mode?: "dev" | "prod";
 };
 
+/**
+ * Defines a relationship between collections in the ORM
+ */
+type RelationType = {
+  /**
+   * The name of the related collection
+   */
+  collectionName: string;
+  /**
+   * The key in the current collection used for the relationship (usually a foreign key).
+   */
+  localKey: string;
+  /**
+   * The key in the related collection that the localKey references (usually a primary key), __id is default value
+   */
+  foreignKey?: string;
+  /**
+   * Optional alias to access the related data (e.g., 'author' for a user relation), collectionName is default value.
+   */
+  as?: string;
+  type: "ONE_TO_ONE" | "ONE_TO_MANY";
+  /**
+   * Behavior when related record is deleted. SET NULL is default value.
+   * - 'CASCADE': also delete dependent records.
+   * - 'SET NULL': set the relation to null
+   * - 'RESTRICT': prevent deletion if used in a relation.
+   * - 'NO ACTION': do nothing
+   */
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
+  /**
+   * Behavior when related record is updated. CASCADE is default value.
+   * - 'CASCADE': update dependent keys.
+   * - 'SET NULL': set the relation to null
+   * - 'RESTRICT': prevent update if used in a relation.
+   * - 'NO ACTION': do nothing
+   */
+  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
+};
+
+type CreatingCollectionOptinType<T> = {
+  /**
+   * Name of the collection
+   */
+  collectionName: string;
+  /**
+   * Choose between `"increment" (default) and `"uuid"`
+   */
+  idStrategy?: "uuid" | "increment";
+  /**
+   * Defines one or more unique key constraints for the collection.
+   */
+  uniqueKeys?: Array<keyof T>;
+  /**
+   * Enables automatic creation timestamp. Default value is false.
+   */
+  createdAt?: boolean;
+  /**
+   * Enables automatic update timestamp. Default value is false.
+   */
+  updatedAt?: boolean;
+  relations?: string | string[] | RelationType | RelationType[];
+};
+
 export {
   OrmInfoType,
   CollectionInfoType,
@@ -144,4 +257,7 @@ export {
   CollectionType,
   DataBaseType,
   DatabaseInfoOptionType,
+  CreatingCollectionOptinType,
+  RelationType,
+  RelationQueryOptionType,
 };

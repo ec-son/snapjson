@@ -2,7 +2,10 @@ import { Collection } from "../lib/collection";
 import { Document } from "../lib/document";
 import { SnapJson } from "../lib/snapjson";
 import { DocumentDataType } from "../types/document-data.type";
-import { DatabaseInfoOptionType } from "../types/orm.type";
+import {
+  CreatingCollectionOptinType,
+  DatabaseInfoOptionType,
+} from "../types/orm.type";
 
 /**
  * Returns instance of collection
@@ -68,16 +71,14 @@ export async function defineCollection<T extends Object>(
  * @returns Collection instance(s).
  */
 export async function createCollection<T extends Object>(
-  collection: string | { collectionName: string; uniqueKeys?: Array<keyof T> },
+  collection: string | CreatingCollectionOptinType<T>,
   opt?: Partial<
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   > & { force?: boolean }
 ): Promise<Collection<T>>;
 
 export async function createCollection<T extends Object>(
-  collections:
-    | string[]
-    | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
+  collections: string[] | CreatingCollectionOptinType<T>[],
   opt?: Partial<
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   > & { force?: boolean }

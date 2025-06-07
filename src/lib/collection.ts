@@ -8,24 +8,21 @@ import {
   QueryOneOptionType,
   QueryOptionType,
   QueryType,
+  RelationQueryOptionType,
 } from "../types/orm.type";
 import { formatSize } from "../utils/utils.func";
 import { Query } from "./query";
 import { SnapJson } from "./snapjson";
 import { saveData } from "../utils/save-data";
-import { defineDocument } from "../utils/shortcutFunc";
+import { defineCollection, defineDocument } from "../utils/shortcutFunc";
+import { getOpts } from "../utils/opts.func";
+import { randomUUID } from "node:crypto";
 
 export class Collection<
   T extends Object,
-  U extends T & { readonly __id: number } = { readonly __id: number } & T
+  U extends T & { readonly __id: string } = { readonly __id: string } & T
 > {
-  private _opt: DatabaseInfoOptionType = {
-    path_db: "db",
-    mode: "dev",
-    splitFile: false,
-    flag: "",
-  };
-  // private collectionInfo: CollectionInfoType;
+  private _opt: DatabaseInfoOptionType;
 
   constructor(
     private readonly _collectionName: string,
@@ -41,17 +38,7 @@ export class Collection<
     if ("__metadata__" === _collectionName)
       throw new Error("Connot create collection with '__metadata__' name.");
 
-    // this.collectionInfo = { collectionName: _collectionName, unique: [] };
-    if (opt) {
-      this._opt.path_db = opt.path_db;
-      this._opt.mode = opt.mode;
-      this._opt.splitFile = opt.splitFile;
-      this._opt.encrypted = opt.encrypted;
-      // if (opt.encrypted) throw new Error("errrrrrr"); //todo message here od english
-      this._opt.secretKey = opt.secretKey;
-      this._opt.salt = opt.salt;
-    }
-    this._opt.flag = _collectionName;
+    this._opt = { ...getOpts(opt), flag: _collectionName };
 
     const orm = new SnapJson({ ...this._opt });
     if (!orm.isExistCollection(this._collectionName))
@@ -60,7 +47,7 @@ export class Collection<
 
   //SELECT
 
-  async findById(__id: number): Promise<DocumentDataType<U> | undefined>;
+  async findById(__id: string): Promise<DocumentDataType<U> | undefined>;
 
   async findById<
     X extends Array<keyof U> | undefined = undefined,
@@ -68,11 +55,11 @@ export class Collection<
       ? { [K in X[number]]: K extends keyof U ? U[K] : never }
       : U
   >(
-    __id: number,
+    __id: string,
     opts: X extends undefined ? QueryOneOptionType<U> : QueryOneOptionType<U, X>
-  ): Promise<DocumentDataType<Y> | undefined>;
+  ): Promise<DocumentDataType<Y & Record<string, any>> | undefined>;
 
-  async findById(__id: number, opts?: any): Promise<any> {
+  async findById(__id: string, opts?: any): Promise<any> {
     return this.select({ __id } as QueryType<Partial<U>>, {
       ...opts,
       limit: -1,
@@ -91,7 +78,7 @@ export class Collection<
   >(
     query: QueryType<Partial<U>>,
     opts: X extends undefined ? QueryOneOptionType<U> : QueryOneOptionType<U, X>
-  ): Promise<DocumentDataType<Y> | undefined>;
+  ): Promise<DocumentDataType<Y & Record<string, any>> | undefined>;
 
   async findOne(
     query: QueryType<any>,
@@ -113,7 +100,7 @@ export class Collection<
   >(
     query: QueryType<Partial<U>>,
     opts: X extends undefined ? QueryOptionType<U> : QueryOptionType<U, X>
-  ): Promise<Array<DocumentDataType<Y>>>;
+  ): Promise<Array<DocumentDataType<Y & Record<string, any>>>>;
 
   async find(
     query: QueryType<Partial<U>>,
@@ -134,11 +121,77 @@ export class Collection<
       structuredClone(collectionData),
       opts as any
     );
-    const result = queryInstance.getData();
+    let result = queryInstance.getData();
     if (!result) return undefined;
-    return defineDocument(result, this._collectionName, this._opt) as Array<
+
+    if (opts?.include)
+      result = await this.getRelationData(result, opts.include);
+
+    const t = defineDocument(result, this._collectionName, this._opt) as Array<
       DocumentDataType<any>
     >;
+
+    return opts?.type === "object"
+      ? result
+      : opts?.type === "json"
+      ? JSON.stringify(result)
+      : t;
+  }
+
+  private async getRelationData(
+    data: any,
+    relationOpts:
+      | string
+      | string[]
+      | RelationQueryOptionType
+      | RelationQueryOptionType[] = []
+  ) {
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
+    let isArray = false;
+
+    if (!Array.isArray(data)) {
+      data = [data];
+      isArray = true;
+    }
+
+    const result = data;
+
+    for (const collectionData of data) {
+      if (!Array.isArray(relationOpts)) relationOpts = [relationOpts as any];
+      for (let el of relationOpts) {
+        if (typeof el === "string") el = { collectionName: el };
+
+        const relation = collectionInfo?.relations?.find(
+          (r) =>
+            r.collectionName === (el as RelationQueryOptionType).collectionName
+        );
+
+        if (!relation) continue;
+
+        const relationcCollection = await defineCollection(
+          relation.collectionName,
+          this._opt
+        );
+
+        const collectionDataRelation = await relationcCollection.find(
+          {
+            [relation.foreignKey]: collectionData[relation.localKey],
+            ...el?.match,
+          } as any,
+          { limit: el?.limit, select: el?.select as any, type: "object" }
+        );
+
+        if (relation.type === "ONE_TO_ONE") {
+          if (collectionDataRelation.length === 0)
+            collectionData[relation.as] = null;
+          else collectionData[relation.as] = collectionDataRelation[0];
+        } else collectionData[relation.as] = collectionDataRelation;
+      }
+    }
+
+    return !isArray ? data : data[0];
   }
 
   // INSERT
@@ -164,16 +217,54 @@ export class Collection<
   ): Promise<DocumentDataType<U> | Array<DocumentDataType<U>>> {
     const isArray = Array.isArray(data);
     if (!Array.isArray(data)) data = [data];
+
     const collectionData = (await this.loadData(
       this._collectionName
     )) as CollectionType<any>;
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
+    const relations = collectionInfo.relations || [];
+
     const tab: U[] = [];
+
+    const getRelations = (data: T): T => {
+      const t = {} as any;
+      for (const relation of relations) {
+        if (relation.localKey in data) {
+          if (
+            relation.type === "ONE_TO_ONE" &&
+            Array.isArray(data[relation.localKey])
+          )
+            t[relation.localKey] = data[relation.localKey][0];
+          else if (
+            relation.type === "ONE_TO_MANY" &&
+            !Array.isArray(data[relation.localKey])
+          )
+            t[relation.localKey] = [data[relation.localKey]];
+          else t[relation.localKey] = data[relation.localKey];
+        }
+      }
+
+      return t;
+    };
+
+    const getId = async () => {
+      if (collectionInfo.idStrategy === "increment") {
+        return (
+          Number.parseInt(await this._lastInsertId(collectionData)) + 1
+        ).toString();
+      }
+
+      return randomUUID();
+    };
+
     for (const key in data) {
       const element = data[key];
-      const __id = (await this._lastInsertId(collectionData)) + 1;
+      const __id = await getId();
 
       await this.constrain(element, collectionData);
-      tab.push({ ...element, __id } as U);
+      tab.push({ ...element, __id, ...getRelations(element) } as U);
       collectionData.push({ ...element, __id } as U);
     }
 
@@ -301,13 +392,13 @@ export class Collection<
   private async constrain(
     data: T | Partial<T>,
     collectionData: CollectionType<U>,
-    __id?: number
+    __id?: string
   ) {
     const collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType;
 
-    collectionInfo.unique?.forEach((key) => {
+    collectionInfo?.unique?.forEach((key) => {
       const t = collectionData.find((el) => {
         if (!el[key] && !data[key]) return false;
         return el[key] === data[key] && el.__id !== __id;
@@ -323,19 +414,19 @@ export class Collection<
   /**
    * Returns the last id inserted. If no document found, it returns 0
    */
-  async lastInsertId(): Promise<number> {
+  async lastInsertId(): Promise<string> {
     return this._lastInsertId();
   }
 
   private async _lastInsertId(
     collectionData?: CollectionType<U>
-  ): Promise<number> {
+  ): Promise<string> {
     collectionData =
       collectionData ||
       ((await this.loadData(this._collectionName)) as CollectionType<any>);
     return collectionData.length > 0
       ? collectionData[collectionData.length - 1].__id
-      : 0;
+      : "0";
   }
 
   /**
@@ -355,8 +446,8 @@ export class Collection<
 
     if (!Array.isArray(keyName)) keyName = [keyName];
     for (const iterator of keyName as Array<string>) {
-      if (collectionInfo.unique.includes(iterator)) continue;
-      collectionInfo.unique.push(iterator);
+      if (collectionInfo?.unique?.includes(iterator)) continue;
+      collectionInfo?.unique?.push(iterator);
       isAddedKey = true;
     }
     if (isAddedKey) await this.saveData(collectionInfo, "collection-info");
@@ -380,9 +471,9 @@ export class Collection<
     const savedKeyName: Array<keyof T> = [];
 
     for (const iterator of uniqueKey) {
-      const index = collectionInfo.unique.findIndex((el) => el === iterator);
+      const index = collectionInfo?.unique?.findIndex((el) => el === iterator);
       if (index === -1) continue;
-      collectionInfo.unique.splice(index, 1);
+      collectionInfo?.unique?.splice(index, 1);
       savedKeyName.push(iterator);
     }
 
@@ -398,7 +489,7 @@ export class Collection<
     const collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType;
-    const keys = collectionInfo.unique;
+    const keys = collectionInfo.unique || [];
     collectionInfo.unique = [];
     await this.saveData(collectionInfo, "collection-info");
     return keys as Array<keyof T>;
@@ -408,8 +499,10 @@ export class Collection<
    * Returns all unique keys.
    */
   async getUniqueKeys(): Promise<Array<keyof T>> {
-    return ((await this.loadData("collection-info")) as CollectionInfoType)
-      .unique as Array<keyof T>;
+    return (
+      (((await this.loadData("collection-info")) as CollectionInfoType)
+        .unique as Array<keyof T>) || []
+    );
   }
 
   get collectionName(): string {
