@@ -175,19 +175,37 @@ export class Collection<
           this._opt
         );
 
-        const collectionDataRelation = await relationcCollection.find(
-          {
-            [relation.foreignKey]: collectionData[relation.localKey],
-            ...el?.match,
-          } as any,
-          { limit: el?.limit, select: el?.select as any, type: "object" }
-        );
-
-        if (relation.type === "ONE_TO_ONE") {
-          if (collectionDataRelation.length === 0)
-            collectionData[relation.as] = null;
-          else collectionData[relation.as] = collectionDataRelation[0];
-        } else collectionData[relation.as] = collectionDataRelation;
+        let collectionDataRelation: any;
+        if (relation.relationType === "belongsTo") {
+          collectionDataRelation =
+            (await relationcCollection.findOne(
+              {
+                [relation.foreignKey]: collectionData[relation.localKey],
+                ...el?.match,
+              } as any,
+              { select: el?.select as any, type: "object" }
+            )) || null;
+        } else {
+          if (relation.relationType === "hasOne") {
+            collectionDataRelation =
+              (await relationcCollection.findOne(
+                {
+                  [relation.localKey]: collectionData[relation.foreignKey],
+                  ...el?.match,
+                } as any,
+                { select: el?.select as any, type: "object" }
+              )) || null;
+          } else {
+            collectionDataRelation = await relationcCollection.find(
+              {
+                [relation.localKey]: collectionData[relation.foreignKey],
+                ...el?.match,
+              } as any,
+              { limit: el?.limit, select: el?.select as any, type: "object" }
+            );
+          }
+        }
+        collectionData[relation.as] = collectionDataRelation;
       }
     }
 
@@ -228,24 +246,23 @@ export class Collection<
 
     const tab: U[] = [];
 
+    const stringifyId = (id: any): string | string[] => {
+      if (!Array.isArray(id)) return Number.isInteger(id) ? id.toString() : id;
+      else
+        return id.map((el) =>
+          Number.isInteger(el) ? el.toString() : el
+        ) as string[];
+    };
+
     const getRelations = (data: T): T => {
       const t = {} as any;
       for (const relation of relations) {
         if (relation.localKey in data) {
-          if (
-            relation.type === "ONE_TO_ONE" &&
-            Array.isArray(data[relation.localKey])
-          )
-            t[relation.localKey] = data[relation.localKey][0];
-          else if (
-            relation.type === "ONE_TO_MANY" &&
-            !Array.isArray(data[relation.localKey])
-          )
-            t[relation.localKey] = [data[relation.localKey]];
-          else t[relation.localKey] = data[relation.localKey];
+          if (Array.isArray(data[relation.localKey]))
+            t[relation.localKey] = stringifyId(data[relation.localKey][0]);
+          else t[relation.localKey] = stringifyId(data[relation.localKey]);
         }
       }
-
       return t;
     };
 
@@ -264,8 +281,9 @@ export class Collection<
       const __id = await getId();
 
       await this.constrain(element, collectionData);
-      tab.push({ ...element, __id, ...getRelations(element) } as U);
-      collectionData.push({ ...element, __id } as U);
+      const _t = { ...element, __id, ...getRelations(element) } as U;
+      tab.push(_t);
+      collectionData.push(_t);
     }
 
     await this.saveData(collectionData);

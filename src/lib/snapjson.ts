@@ -112,20 +112,30 @@ export class SnapJson {
           if (
             !collectionInfo.find(
               (el) => el.collectionName === relation.collectionName
+            ) &&
+            !(collections as CreatingCollectionOptinType<T>[]).find(
+              (el) => el.collectionName === relation.collectionName
             )
           )
             throw new Error(
               `Collection '${relation.collectionName}' doesn't exist.`
             );
 
+          relation.relationType ||= "hasOne";
+          relation.localKey ||= `${
+            relation.relationType === "belongsTo"
+              ? relation.collectionName
+              : collection.collectionName
+          }Id`;
+
           const newRelation: RelationType = {
             collectionName: relation.collectionName,
-            localKey: relation.localKey || `${relation.collectionName}Id`,
+            localKey: relation.localKey,
             foreignKey: relation.foreignKey || "__id",
             as: relation.as || relation.collectionName,
             onDelete: relation.onDelete || "SET NULL",
             onUpdate: relation.onUpdate || "CASCADE",
-            type: relation.type || "ONE_TO_ONE",
+            relationType: relation.relationType,
           };
 
           newRelations.push(newRelation);

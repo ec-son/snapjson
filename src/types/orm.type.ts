@@ -66,7 +66,7 @@ type RelationQueryOptionType = {
   collectionName: string;
   limit?: number;
   select?: string | string[];
-  match?: QueryType<Partial<any>>;
+  match?: QueryType<Partial<Record<string, any>>>;
 };
 
 type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
@@ -187,36 +187,50 @@ type DatabaseInfoOptionType = {
  */
 type RelationType = {
   /**
-   * The name of the related collection
+   * The name of the related (target) collection
    */
   collectionName: string;
+
   /**
-   * The key in the current collection used for the relationship (usually a foreign key).
+   * For 'belongsTo' : the
+   * The key in the current collection that holds the foreign key.
+   *
    */
-  localKey: string;
+  localKey?: string;
+
   /**
-   * The key in the related collection that the localKey references (usually a primary key), __id is default value
+   * The key in the target collection that the localKey references, __id is default value
    */
   foreignKey?: string;
+
   /**
    * Optional alias to access the related data (e.g., 'author' for a user relation), collectionName is default value.
    */
   as?: string;
-  type: "ONE_TO_ONE" | "ONE_TO_MANY";
+
   /**
-   * Behavior when related record is deleted. SET NULL is default value.
-   * - 'CASCADE': also delete dependent records.
-   * - 'SET NULL': set the relation to null
-   * - 'RESTRICT': prevent deletion if used in a relation.
-   * - 'NO ACTION': do nothing
+   * Type of relationship between this collection and the target collection. hasOne is default value.
+   * - 'belongsTo': This collection belongs to the target collection.
+   * - 'hasOne': This collection is referenced by one document in the target collection.
+   * - 'hasMany': This collection is referenced by multiple documents in the target collection.
+   */
+  relationType?: "belongsTo" | "hasOne" | "hasMany";
+
+  /**
+   * Action to take when related record is deleted. SET NULL is default value.
+   * - 'CASCADE': delete this record too.
+   * - 'SET NULL': set the localKey to null.
+   * - 'RESTRICT': prevent deletion if relation exists.
+   * - 'NO ACTION': do nothing.
    */
   onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
+
   /**
-   * Behavior when related record is updated. CASCADE is default value.
-   * - 'CASCADE': update dependent keys.
-   * - 'SET NULL': set the relation to null
-   * - 'RESTRICT': prevent update if used in a relation.
-   * - 'NO ACTION': do nothing
+   * Action to take when the foreignKey is updated. CASCADE is default value.
+   * - 'CASCADE': update the localKey accordingly.
+   * - 'SET NULL': set the localKey to null.
+   * - 'RESTRICT': prevent update if relation exists.
+   * - 'NO ACTION': do nothing.
    */
   onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
 };

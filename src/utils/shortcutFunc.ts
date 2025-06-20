@@ -55,6 +55,15 @@ export async function defineCollection<T extends Object>(
   return orm.collection(collectionName, force);
 }
 
+export async function createCollections<T extends Object>(
+  collections: string[] | CreatingCollectionOptinType<T>[],
+  opt?: Partial<
+    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
+  > & { force?: boolean }
+): Promise<Collection<T>[]> {
+  return createCollection(collections, opt);
+}
+
 /**
  * Creates a new collection.
  * @param {string | { name: string; uniqueKeys?: Array<keyof T> }} collection The name of the collection or an object with the following properties:
