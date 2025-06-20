@@ -20,7 +20,13 @@ import { randomUUID } from "node:crypto";
 
 export class Collection<
   T extends Object,
-  U extends T & { readonly __id: string } = { readonly __id: string } & T
+  U extends T & {
+    readonly __id: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+  } = {
+    readonly __id: string;
+  } & T
 > {
   private _opt: DatabaseInfoOptionType;
 
@@ -254,7 +260,7 @@ export class Collection<
         ) as string[];
     };
 
-    const getRelations = (data: T): T => {
+    const getRelation = (data: T): T => {
       const t = {} as any;
       for (const relation of relations) {
         if (relation.localKey in data) {
@@ -263,6 +269,10 @@ export class Collection<
           else t[relation.localKey] = stringifyId(data[relation.localKey]);
         }
       }
+      console.log(relations);
+
+      console.log("value", t);
+
       return t;
     };
 
@@ -276,12 +286,25 @@ export class Collection<
       return randomUUID();
     };
 
+    const getTimestamp = () => {
+      const timestamp: { createdAt?: Date; updatedAt?: Date } = {};
+
+      if (collectionInfo.createdAt) timestamp.createdAt = new Date();
+      if (collectionInfo.updatedAt) timestamp.updatedAt = new Date();
+      return timestamp;
+    };
+
     for (const key in data) {
       const element = data[key];
       const __id = await getId();
 
       await this.constrain(element, collectionData);
-      const _t = { ...element, __id, ...getRelations(element) } as U;
+      const _t = {
+        ...element,
+        __id,
+        ...getRelation(element),
+        ...getTimestamp(),
+      } as U;
       tab.push(_t);
       collectionData.push(_t);
     }
@@ -324,6 +347,11 @@ export class Collection<
     const collectionData = (await this.loadData(
       this._collectionName
     )) as CollectionType<any>;
+
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
+
     const queryInstance = new Query(query, structuredClone(collectionData));
     let result = queryInstance.getData() as CollectionType<U>;
 
@@ -331,6 +359,34 @@ export class Collection<
     if (!isMany) result = result.slice(0, 1);
 
     const updated = [];
+
+    const relations = collectionInfo.relations || [];
+
+    const stringifyId = (id: any): string | string[] => {
+      if (!Array.isArray(id)) return Number.isInteger(id) ? id.toString() : id;
+      else
+        return id.map((el) =>
+          Number.isInteger(el) ? el.toString() : el
+        ) as string[];
+    };
+
+    const getRelation = (data: Partial<T>): T => {
+      const t = {} as any;
+      for (const relation of relations) {
+        if (relation.localKey in data) {
+          if (Array.isArray(data[relation.localKey]))
+            t[relation.localKey] = stringifyId(data[relation.localKey][0]);
+          else t[relation.localKey] = stringifyId(data[relation.localKey]);
+        }
+      }
+      return t;
+    };
+
+    const getTimestamp = () => {
+      if (collectionInfo.updatedAt) return { updatedAt: new Date() };
+      else {
+      }
+    };
 
     for (const index in collectionData) {
       const document = collectionData[index];
@@ -342,7 +398,12 @@ export class Collection<
       }
 
       await this.constrain(data, collectionData, document.__id);
-      collectionData[index] = { ...t, ...data };
+      collectionData[index] = {
+        ...t,
+        ...data,
+        ...getRelation(data),
+        ...getTimestamp(),
+      };
       updated.push(collectionData[index]);
       if (result.length === 1) break;
     }
@@ -380,6 +441,10 @@ export class Collection<
     const collectionData = (await this.loadData(
       this._collectionName
     )) as CollectionType<any>;
+    const collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType;
+    const relations = collectionInfo.relations || [];
     const queryInstance = new Query(query, structuredClone(collectionData));
     const result = queryInstance.getData() as CollectionType<U>;
 
