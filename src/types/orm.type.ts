@@ -223,7 +223,7 @@ type RelationType = {
    * - 'RESTRICT': prevent deletion if relation exists.
    * - 'NO ACTION': do nothing.
    */
-  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
 
   /**
    * Action to take when the foreignKey is updated. CASCADE is default value.
@@ -232,7 +232,7 @@ type RelationType = {
    * - 'RESTRICT': prevent update if relation exists.
    * - 'NO ACTION': do nothing.
    */
-  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" | "SET DEFAULT";
+  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
 };
 
 type CreatingCollectionOptinType<T> = {

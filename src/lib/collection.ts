@@ -9,6 +9,7 @@ import {
   QueryOptionType,
   QueryType,
   RelationQueryOptionType,
+  RelationType,
 } from "../types/orm.type";
 import { formatSize } from "../utils/utils.func";
 import { Query } from "./query";
@@ -248,7 +249,7 @@ export class Collection<
     const collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType;
-    const relations = collectionInfo.relations || [];
+    const relations = await this.getAllRelations(this._collectionName, "child");
 
     const tab: U[] = [];
 
@@ -269,10 +270,6 @@ export class Collection<
           else t[relation.localKey] = stringifyId(data[relation.localKey]);
         }
       }
-      console.log(relations);
-
-      console.log("value", t);
-
       return t;
     };
 
@@ -359,8 +356,12 @@ export class Collection<
     if (!isMany) result = result.slice(0, 1);
 
     const updated = [];
+    const oldAndUpdatedData = [];
 
-    const relations = collectionInfo.relations || [];
+    const relations = await this.getAllRelations(
+      this._collectionName,
+      "parent"
+    );
 
     const stringifyId = (id: any): string | string[] => {
       if (!Array.isArray(id)) return Number.isInteger(id) ? id.toString() : id;
@@ -371,8 +372,9 @@ export class Collection<
     };
 
     const getRelation = (data: Partial<T>): T => {
+      const childrenRelation = relations.filter((el) => el.flag === "child");
       const t = {} as any;
-      for (const relation of relations) {
+      for (const relation of childrenRelation) {
         if (relation.localKey in data) {
           if (Array.isArray(data[relation.localKey]))
             t[relation.localKey] = stringifyId(data[relation.localKey][0]);
@@ -384,8 +386,7 @@ export class Collection<
 
     const getTimestamp = () => {
       if (collectionInfo.updatedAt) return { updatedAt: new Date() };
-      else {
-      }
+      return {};
     };
 
     for (const index in collectionData) {
@@ -394,21 +395,94 @@ export class Collection<
       if (!t) continue;
       if ("__id" in data) {
         const { __id, ...rest } = data;
-        data = rest as any;
+        // data = rest as any;
       }
 
       await this.constrain(data, collectionData, document.__id);
-      collectionData[index] = {
+      const _updated = {
         ...t,
         ...data,
         ...getRelation(data),
         ...getTimestamp(),
       };
-      updated.push(collectionData[index]);
+      oldAndUpdatedData.push({
+        oldData: collectionData[index],
+        updatedData: _updated,
+      });
+      collectionData[index] = _updated;
+      updated.push(_updated);
       if (result.length === 1) break;
     }
 
+    const cascading = async (
+      oldAndUpdatedData: {
+        oldData: Record<string, number>[];
+        updatedData: Record<string, number>[];
+      }[],
+      relations: (RelationType & {
+        parent: string;
+        child: string;
+      })[]
+    ) => {
+      console.log("-1");
+      if (!Array.isArray(oldAndUpdatedData))
+        oldAndUpdatedData = [oldAndUpdatedData];
+      let isUpdatedlocalKey = false;
+      for (const relation of relations) {
+        for (const key in oldAndUpdatedData) {
+          const { oldData, updatedData } = oldAndUpdatedData[key];
+
+          if (oldData[relation.foreignKey] !== updatedData[relation.foreignKey])
+            isUpdatedlocalKey = true;
+          else oldAndUpdatedData.splice(key as any, 1);
+        }
+        if (isUpdatedlocalKey) break;
+      }
+
+      if (!isUpdatedlocalKey) return;
+      console.log("-2");
+
+      for (const element of oldAndUpdatedData) {
+        const { oldData, updatedData } = element;
+        for (const relation of relations) {
+          if (relation.onUpdate === "NO ACTION") continue;
+
+          const collectionRelation = await defineCollection(relation.child);
+          if (relation.onUpdate === "CASCADE") {
+            await collectionRelation.updateMany(
+              { [relation.localKey]: updatedData[relation.foreignKey] },
+              {
+                [relation.localKey]: oldData[relation.foreignKey],
+              }
+            );
+          } else if (relation.onUpdate === "SET NULL") {
+            const t = await collectionRelation.updateMany(
+              { [relation.localKey]: null },
+              { [relation.localKey]: oldData[relation.foreignKey] }
+            );
+          } else if (relation.onUpdate === "RESTRICT") {
+            throw new Error("Error of restrict on update"); //todo Put throw message here
+          }
+        }
+      }
+    };
+
+    const parentsRelation = relations.filter((el) => el.flag === "parent");
+
+    for (const key in parentsRelation) {
+      if (parentsRelation[key].onUpdate === "RESTRICT")
+        await cascading(
+          !isMany ? oldAndUpdatedData[0] : oldAndUpdatedData,
+          parentsRelation.splice(key as any, 1)
+        );
+    }
+
     await this.saveData(collectionData);
+    if (parentsRelation.length > 0)
+      await cascading(
+        !isMany ? oldAndUpdatedData[0] : oldAndUpdatedData,
+        parentsRelation
+      );
     return isMany
       ? (defineDocument(updated, this._collectionName, this._opt) as Array<
           DocumentDataType<U>
@@ -444,7 +518,6 @@ export class Collection<
     const collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType;
-    const relations = collectionInfo.relations || [];
     const queryInstance = new Query(query, structuredClone(collectionData));
     const result = queryInstance.getData() as CollectionType<U>;
 
@@ -454,17 +527,65 @@ export class Collection<
       const element = result[key];
       const index = collectionData.findIndex((el) => el.__id === element.__id);
       resultOfDeleted.push(...collectionData.splice(index, 1));
-      if (!isMany) {
-        await this.saveData(collectionData);
-        return defineDocument(
-          resultOfDeleted[0],
-          this._collectionName,
-          this._opt
-        ) as DocumentDataType<U>;
+
+      if (!isMany) break;
+    }
+
+    const cascading = async (
+      datas: Record<string, any>,
+      relations: (RelationType & {
+        parent: string;
+        child: string;
+      })[]
+    ) => {
+      if (!Array.isArray(datas)) datas = [datas];
+
+      for (const data of datas as Array<Record<string, any>>) {
+        for (const relation of relations) {
+          if (relation.onDelete === "NO ACTION") continue;
+
+          const collectionRelation = await defineCollection(relation.child);
+          if (relation.onDelete === "CASCADE") {
+            await collectionRelation.deleteMany({
+              [relation.localKey]: data[relation.foreignKey],
+            });
+          } else if (relation.onDelete === "SET NULL") {
+            const t = await collectionRelation.updateMany(
+              { [relation.localKey]: null },
+              { [relation.localKey]: data[relation.foreignKey] }
+            );
+          } else if (relation.onDelete === "RESTRICT") {
+            throw new Error("Error of restrict delete"); //todo Put throw message here
+          }
+        }
       }
+    };
+
+    const relations = await this.getAllRelations(
+      this._collectionName,
+      "parent"
+    );
+
+    for (const key in relations) {
+      if (relations[key].onDelete === "RESTRICT")
+        await cascading(
+          !isMany ? resultOfDeleted[0] : resultOfDeleted,
+          relations.splice(key as any, 1)
+        );
+    }
+
+    if (!isMany) {
+      await this.saveData(collectionData);
+      await cascading(resultOfDeleted[0], relations);
+      return defineDocument(
+        resultOfDeleted[0],
+        this._collectionName,
+        this._opt
+      ) as DocumentDataType<U>;
     }
 
     await this.saveData(collectionData);
+    await cascading(resultOfDeleted, relations);
     return defineDocument(
       resultOfDeleted,
       this._collectionName,
@@ -586,6 +707,95 @@ export class Collection<
       (((await this.loadData("collection-info")) as CollectionInfoType)
         .unique as Array<keyof T>) || []
     );
+  }
+
+  private async getAllRelations(
+    collectionName: string,
+    flag: "all" | "child" | "parent" = "all"
+  ): Promise<
+    (RelationType & {
+      parent: string;
+      child: string;
+      flag: "child" | "parent";
+    })[]
+  > {
+    const collectionInfos = (await loadData({
+      ...this._opt,
+      flag: "collection-info",
+    })) as CollectionInfoType[];
+
+    const collectionRelations: (RelationType & {
+      parent: string;
+      child: string;
+      flag: "child" | "parent";
+    })[] = [];
+
+    const childTest = (
+      collectionInfo: CollectionInfoType,
+      relation: RelationType
+    ) =>
+      (collectionInfo.collectionName === collectionName &&
+        relation.relationType === "belongsTo") ||
+      (relation.collectionName === collectionName &&
+        relation.relationType !== "belongsTo");
+
+    const parentTest = (
+      collectionInfo: CollectionInfoType,
+      relation: RelationType
+    ) =>
+      (collectionInfo.collectionName === collectionName &&
+        relation.relationType !== "belongsTo") ||
+      (relation.collectionName === collectionName &&
+        relation.relationType === "belongsTo");
+
+    const getParentAndChild = (
+      collectionInfo: CollectionInfoType,
+      relation: RelationType
+    ) => {
+      let t: { parent: string; child: string };
+
+      if (relation.relationType === "belongsTo")
+        t = {
+          parent: relation.collectionName,
+          child: collectionInfo.collectionName,
+        };
+      else
+        t = {
+          parent: collectionInfo.collectionName,
+          child: relation.collectionName,
+        };
+
+      return t;
+    };
+
+    for (const collectionInfo of collectionInfos) {
+      for (const relation of collectionInfo.relations) {
+        if (flag === "child" && childTest(collectionInfo, relation))
+          collectionRelations.push({
+            ...relation,
+            ...getParentAndChild(collectionInfo, relation),
+            flag: "child",
+          });
+        else if (flag === "parent" && parentTest(collectionInfo, relation))
+          collectionRelations.push({
+            ...relation,
+            ...getParentAndChild(collectionInfo, relation),
+            flag: "parent",
+          });
+        else if (
+          flag === "all" &&
+          (childTest(collectionInfo, relation) ||
+            parentTest(collectionInfo, relation))
+        ) {
+          collectionRelations.push({
+            ...relation,
+            ...getParentAndChild(collectionInfo, relation),
+            flag: childTest(collectionInfo, relation) ? "child" : "parent",
+          });
+        }
+      }
+    }
+    return collectionRelations;
   }
 
   get collectionName(): string {
