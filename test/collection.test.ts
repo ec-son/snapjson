@@ -2,8 +2,9 @@ import { Collection } from "../src/lib/collection";
 import { loadData } from "../src/utils/load-data";
 import { saveData } from "../src/utils/save-data";
 import { SnapJson } from "../src/lib/snapjson";
-import { defineDocument } from "../src/utils/shortcutFunc";
+import * as shortcutFunc from "../src/utils/shortcutFunc";
 import { DatabaseInfoOptionType } from "../src/types/orm.type";
+import { Document } from "src/lib/document";
 
 jest.mock("src/utils/load-data", () => ({
   loadData: jest.fn(),
@@ -17,10 +18,6 @@ jest.mock("../src/lib/snapjson", () => ({
   SnapJson: jest.fn().mockImplementation(() => ({
     isExistCollection: jest.fn().mockReturnValue(true),
   })),
-}));
-
-jest.mock("src/utils/shortcutFunc", () => ({
-  defineDocument: jest.fn((t) => t),
 }));
 
 /**
@@ -52,6 +49,9 @@ jest.mock("src/utils/shortcutFunc", () => ({
 
 describe("Collection class", () => {
   const collectionName = "testCollection";
+  const collectionInfo = [
+    { collectionName: "testCollection", unique: [], relations: [] },
+  ];
   const mockCollectionData = [
     { __id: 1, name: "Test Item 1" },
     { __id: 2, name: "Test Item 2" },
@@ -65,14 +65,32 @@ describe("Collection class", () => {
   } as Partial<
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   >;
+
   let collection;
+  let defineDocument;
+  const isNow = (date: string): boolean => {
+    return (
+      new Date(date).toISOString().split("T")[0] ===
+      new Date().toISOString().split("T")[0]
+    );
+  };
+
   beforeEach(() => {
     collection = new Collection(collectionName, mockOpts);
     (loadData as jest.Mock).mockClear();
     (saveData as jest.Mock).mockClear();
-    (loadData as jest.Mock).mockResolvedValue(
-      structuredClone(mockCollectionData)
+
+    (loadData as jest.Mock).mockImplementation(
+      jest.fn(({ flag }) => {
+        if (flag === "orm-info") return structuredClone({ splitFile: false });
+        else if (flag === "collection-info")
+          return structuredClone(collectionInfo);
+        else return structuredClone(mockCollectionData);
+      })
     );
+
+    defineDocument = jest.spyOn(shortcutFunc, "defineDocument");
+    (defineDocument as jest.Mock).mockImplementation((t) => t);
   });
 
   /**
@@ -80,39 +98,62 @@ describe("Collection class", () => {
    */
 
   describe("Inserting", () => {
-    const mockData = { name: "Test Item1" };
+    const mockData = { name: "Test Item 3" };
     it("should insert data and return a document with add method", async () => {
       const result = await collection.add(mockData);
 
       expect(loadData).toHaveBeenCalledWith(mockOpts);
       expect(defineDocument).toHaveBeenCalled();
-      expect(result).toEqual({ __id: 3, ...mockData });
+      expect(result).toEqual({ __id: "3", ...mockData });
       expect(saveData).toHaveBeenCalled();
     });
 
     it("should insert data and return a document with inserOne method", async () => {
-      const result = await collection.insertOne(mockData);
+      (loadData as jest.Mock).mockResolvedValueOnce([]);
 
-      expect(result).toEqual({ __id: 3, ...mockData });
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        {
+          collectionName: "testCollection",
+          idStrategy: "uuid",
+          unique: [],
+          createdAt: true,
+          relations: [],
+        },
+      ]);
+
+      const result = await collection.insertOne(structuredClone(mockData));
+
+      expect(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          result.__id
+        )
+      ).toBeTruthy();
+
+      expect(isNow(result.createdAt)).toBeTruthy();
     });
 
     it("should insert data and return a document with create method", async () => {
       const result = await collection.create(mockData);
-
-      expect(result).toEqual({ __id: 3, ...mockData });
+      expect(result).toEqual({ __id: "3", ...mockData });
     });
 
     it("should insert an array of data and return an array of document with insertMany method", async () => {
       const result = await collection.insertMany([mockData]);
 
-      expect(result).toEqual([{ __id: 3, ...mockData }]);
+      expect(result).toEqual([{ __id: "3", ...mockData }]);
     });
 
     it("should throw error when creating a new document, constrain", async () => {
       (loadData as jest.Mock).mockImplementation(
         jest.fn(({ flag }) => {
           if (flag === "collection-info")
-            return [{ collectionName: "testCollection", unique: ["name"] }];
+            return [
+              {
+                collectionName: "testCollection",
+                unique: ["name"],
+                relations: [],
+              },
+            ];
           return structuredClone(mockCollectionData);
         })
       );
@@ -129,10 +170,30 @@ describe("Collection class", () => {
 
   describe("Updating", () => {
     it("should update a document and return the updated document with updateOne method", async () => {
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { __id: 1, name: "Test Item 1" },
+        { __id: 2, name: "Test Item 2" },
+      ]);
+
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        {
+          collectionName: "testCollection",
+          unique: [],
+          updatedAt: true,
+          relations: [],
+        },
+      ]);
+
       const mockData = { name: "Updated Item" };
       const result = await collection.updateOne(mockData, { __id: 1 });
 
-      expect(result).toEqual({ __id: 1, name: "Updated Item" });
+      expect(result).toEqual({
+        __id: 1,
+        name: "Updated Item",
+        updatedAt: result.updatedAt,
+      });
+
+      expect(isNow(result.updatedAt)).toBeTruthy();
     });
 
     it("should update an array of document and return an array of updated documents with updateMany method", async () => {
@@ -151,7 +212,13 @@ describe("Collection class", () => {
       (loadData as jest.Mock).mockImplementation(
         jest.fn(({ flag }) => {
           if (flag === "collection-info")
-            return [{ collectionName: "testCollection", unique: ["name"] }];
+            return [
+              {
+                collectionName: "testCollection",
+                unique: ["name"],
+                relations: [],
+              },
+            ];
           return structuredClone(mockCollectionData);
         })
       );
@@ -179,7 +246,7 @@ describe("Collection class", () => {
 
   describe("Deleting", () => {
     it("should delete a document and return it", async () => {
-      (loadData as jest.Mock).mockResolvedValue(
+      (loadData as jest.Mock).mockResolvedValueOnce(
         structuredClone(mockCollectionData)
       );
 
@@ -215,28 +282,34 @@ describe("Collection class", () => {
 
   describe("Selecting", () => {
     it("should return document by id with findById method", async () => {
+      (defineDocument as jest.Mock).mockRestore();
       (loadData as jest.Mock).mockResolvedValue(
         structuredClone(mockCollectionData)
       );
       const result = await collection.findById(1);
-
-      expect(result).toEqual(mockCollectionData[0]);
+      expect(result).toBeInstanceOf(Document);
     });
 
-    it("should return a document with findOne method", async () => {
+    it("should return a document as json with findOne method", async () => {
       (loadData as jest.Mock).mockResolvedValue(
         structuredClone(mockCollectionData)
       );
-      const result = await collection.findOne({ __id: { $lte: 2 } });
+      const result = await (collection as Collection<any>).findOne(
+        { __id: { $lte: 2 } },
+        { type: "json" }
+      );
 
-      expect(result).toEqual(mockCollectionData[0]);
+      expect(result).toEqual(JSON.stringify(mockCollectionData[0]));
     });
 
-    it("should return many documents with find method", async () => {
+    it("should return many documents as object with find method", async () => {
       (loadData as jest.Mock).mockResolvedValue(
         structuredClone(mockCollectionData)
       );
-      const result = await collection.find({ __id: { $lte: 2 } });
+      const result = await collection.find(
+        { __id: { $lte: 2 } },
+        { type: "object" }
+      );
 
       expect(result).toEqual(mockCollectionData);
     });

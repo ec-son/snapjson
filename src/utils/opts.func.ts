@@ -13,8 +13,14 @@ export function getOpts(
   const t = {
     path_db: opt.path_db || process.env.SNAPJSON_PATH_DB || "db",
     mode: opt.mode || (process.env?.NODE_ENV === "production" ? "prod" : "dev"),
-    splitFile: opt.splitFile || getEnvBoolean("SNAPJSON_SPLITFILE"),
-    encrypted: opt.encrypted || getEnvBoolean("SNAPJSON_ENCRYPTED"),
+    splitFile:
+      opt.splitFile !== undefined
+        ? opt.splitFile
+        : getEnvBoolean("SNAPJSON_SPLITFILE"),
+    encrypted:
+      opt.encrypted !== undefined
+        ? opt.encrypted
+        : getEnvBoolean("SNAPJSON_ENCRYPTED"),
     secretKey: opt.secretKey || process.env.SNAPJSON_SECRETKEY,
     salt: opt.salt || process.env.SNAPJSON_SALT,
   } as Pick<

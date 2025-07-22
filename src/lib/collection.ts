@@ -123,6 +123,15 @@ export class Collection<
     const collectionData = (await this.loadData(
       this._collectionName
     )) as CollectionType<any>;
+
+    if (opts.select && !Array.isArray(opts.select)) opts.select = [opts.select];
+
+    let isSelectActived: string[] | null = null;
+    if (opts.include && Array.isArray(opts.select) && opts.select.length > 0) {
+      isSelectActived = opts.select;
+      opts.select = undefined;
+    }
+
     const queryInstance = new Query(
       query,
       structuredClone(collectionData),
@@ -131,8 +140,26 @@ export class Collection<
     let result = queryInstance.getData();
     if (!result) return undefined;
 
-    if (opts?.include)
-      result = await this.getRelationData(result, opts.include);
+    if (opts.include) {
+      result = await this.getRelationData(
+        result,
+        opts.include,
+        isSelectActived
+      );
+      if (isSelectActived) {
+        const getExtractObj = (el) => {
+          const extractObj = {} as Pick<U, keyof U>;
+          isSelectActived.forEach((property) => {
+            if (el.hasOwnProperty(property))
+              extractObj[property] = el[property];
+          });
+          return extractObj;
+        };
+        if (!Array.isArray(result)) {
+          result = getExtractObj(result);
+        } else result = result.map((el) => getExtractObj(el));
+      }
+    }
 
     const t = defineDocument(result, this._collectionName, this._opt) as Array<
       DocumentDataType<any>
@@ -141,7 +168,7 @@ export class Collection<
     return opts?.type === "object"
       ? result
       : opts?.type === "json"
-      ? JSON.stringify(result)
+      ? (JSON.stringify(result) as any)
       : t;
   }
 
@@ -151,7 +178,8 @@ export class Collection<
       | string
       | string[]
       | RelationQueryOptionType
-      | RelationQueryOptionType[] = []
+      | RelationQueryOptionType[] = [],
+    selectParent: string[] | null
   ) {
     const collectionInfo = (await this.loadData(
       "collection-info"
@@ -163,25 +191,28 @@ export class Collection<
       isArray = true;
     }
 
-    const result = data;
+    if (Array.isArray(data) && data.length === 0) return [];
 
-    for (const collectionData of data) {
-      if (!Array.isArray(relationOpts)) relationOpts = [relationOpts as any];
-      for (let el of relationOpts) {
-        if (typeof el === "string") el = { collectionName: el };
+    if (!Array.isArray(relationOpts)) relationOpts = [relationOpts as any];
+    for (let el of relationOpts) {
+      if (typeof el === "string") el = { collectionName: el };
 
-        const relation = collectionInfo?.relations?.find(
-          (r) =>
-            r.collectionName === (el as RelationQueryOptionType).collectionName
-        );
+      const relation = collectionInfo?.relations?.find(
+        (r) =>
+          r.collectionName === (el as RelationQueryOptionType).collectionName
+      );
 
-        if (!relation) continue;
+      if (!relation) continue;
 
-        const relationcCollection = await defineCollection(
-          relation.collectionName,
-          this._opt
-        );
+      if (Array.isArray(selectParent) && !selectParent.includes(relation.as))
+        continue;
 
+      const relationcCollection = await defineCollection(
+        relation.collectionName,
+        this._opt
+      );
+
+      for (const collectionData of data) {
         let collectionDataRelation: any;
         if (relation.relationType === "belongsTo") {
           collectionDataRelation =
@@ -190,7 +221,11 @@ export class Collection<
                 [relation.foreignKey]: collectionData[relation.localKey],
                 ...el?.match,
               } as any,
-              { select: el?.select as any, type: "object" }
+              {
+                select: el?.select as any,
+                type: "object",
+                include: el?.include as any,
+              }
             )) || null;
         } else {
           if (relation.relationType === "hasOne") {
@@ -200,7 +235,11 @@ export class Collection<
                   [relation.localKey]: collectionData[relation.foreignKey],
                   ...el?.match,
                 } as any,
-                { select: el?.select as any, type: "object" }
+                {
+                  select: el?.select as any,
+                  type: "object",
+                  include: el?.include as any,
+                }
               )) || null;
           } else {
             collectionDataRelation = await relationcCollection.find(
@@ -208,7 +247,14 @@ export class Collection<
                 [relation.localKey]: collectionData[relation.foreignKey],
                 ...el?.match,
               } as any,
-              { limit: el?.limit, select: el?.select as any, type: "object" }
+              {
+                limit: el?.limit,
+                select: el?.select as any,
+                type: "object",
+                sort: el?.sort as any,
+                include: el?.include as any,
+                offset: el?.offset as any,
+              }
             );
           }
         }
@@ -274,13 +320,11 @@ export class Collection<
     };
 
     const getId = async () => {
-      if (collectionInfo.idStrategy === "increment") {
-        return (
-          Number.parseInt(await this._lastInsertId(collectionData)) + 1
-        ).toString();
-      }
+      if (collectionInfo.idStrategy === "uuid") return randomUUID();
 
-      return randomUUID();
+      return (
+        Number.parseInt(await this._lastInsertId(collectionData)) + 1
+      ).toString();
     };
 
     const getTimestamp = () => {
@@ -358,9 +402,9 @@ export class Collection<
     const updated = [];
     const oldAndUpdatedData = [];
 
-    const relations = await this.getAllRelations(
+    const relationsAll = await this.getAllRelations(
       this._collectionName,
-      "parent"
+      "all"
     );
 
     const stringifyId = (id: any): string | string[] => {
@@ -372,7 +416,7 @@ export class Collection<
     };
 
     const getRelation = (data: Partial<T>): T => {
-      const childrenRelation = relations.filter((el) => el.flag === "child");
+      const childrenRelation = relationsAll.filter((el) => el.flag === "child");
       const t = {} as any;
       for (const relation of childrenRelation) {
         if (relation.localKey in data) {
@@ -381,6 +425,7 @@ export class Collection<
           else t[relation.localKey] = stringifyId(data[relation.localKey]);
         }
       }
+
       return t;
     };
 
@@ -395,7 +440,6 @@ export class Collection<
       if (!t) continue;
       if ("__id" in data) {
         const { __id, ...rest } = data;
-        // data = rest as any;
       }
 
       await this.constrain(data, collectionData, document.__id);
@@ -424,7 +468,6 @@ export class Collection<
         child: string;
       })[]
     ) => {
-      console.log("-1");
       if (!Array.isArray(oldAndUpdatedData))
         oldAndUpdatedData = [oldAndUpdatedData];
       let isUpdatedlocalKey = false;
@@ -440,7 +483,20 @@ export class Collection<
       }
 
       if (!isUpdatedlocalKey) return;
-      console.log("-2");
+
+      for (const i in relations) {
+        for (let j = 1; j < relations.length; j++) {
+          const a = relations[i];
+          const b = relations[j];
+
+          if (
+            a.child === b.child &&
+            a.localKey === b.localKey &&
+            a.foreignKey === b.foreignKey
+          )
+            relations.splice(j, 1);
+        }
+      }
 
       for (const element of oldAndUpdatedData) {
         const { oldData, updatedData } = element;
@@ -461,13 +517,15 @@ export class Collection<
               { [relation.localKey]: oldData[relation.foreignKey] }
             );
           } else if (relation.onUpdate === "RESTRICT") {
-            throw new Error("Error of restrict on update"); //todo Put throw message here
+            throw new Error(
+              "Update operation blocked: This record is referenced by another collection with an ON UPDATE RESTRICT rule. Modifying the key is not allowed."
+            );
           }
         }
       }
     };
 
-    const parentsRelation = relations.filter((el) => el.flag === "parent");
+    const parentsRelation = relationsAll.filter((el) => el.flag === "parent");
 
     for (const key in parentsRelation) {
       if (parentsRelation[key].onUpdate === "RESTRICT")
@@ -515,9 +573,7 @@ export class Collection<
     const collectionData = (await this.loadData(
       this._collectionName
     )) as CollectionType<any>;
-    const collectionInfo = (await this.loadData(
-      "collection-info"
-    )) as CollectionInfoType;
+
     const queryInstance = new Query(query, structuredClone(collectionData));
     const result = queryInstance.getData() as CollectionType<U>;
 
@@ -540,6 +596,20 @@ export class Collection<
     ) => {
       if (!Array.isArray(datas)) datas = [datas];
 
+      for (const i in relations) {
+        for (let j = 1; j < relations.length; j++) {
+          const a = relations[i];
+          const b = relations[j];
+
+          if (
+            a.child === b.child &&
+            a.localKey === b.localKey &&
+            a.foreignKey === b.foreignKey
+          )
+            relations.splice(j, 1);
+        }
+      }
+
       for (const data of datas as Array<Record<string, any>>) {
         for (const relation of relations) {
           if (relation.onDelete === "NO ACTION") continue;
@@ -555,7 +625,9 @@ export class Collection<
               { [relation.localKey]: data[relation.foreignKey] }
             );
           } else if (relation.onDelete === "RESTRICT") {
-            throw new Error("Error of restrict delete"); //todo Put throw message here
+            throw new Error(
+              "Delete operation blocked: This record is referenced by another collection with an ON DELETE RESTRICT rule. Deleting it is not allowed."
+            );
           }
         }
       }

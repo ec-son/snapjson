@@ -27,7 +27,7 @@ jest.mock("../src/utils/utils.func");
  * size
  */
 
-describe("saveData()", () => {
+describe("Snapjson", () => {
   const mockDataBase = {
     databaseInfo: { splitFile: false },
     collectionInfo: [{ collectionName: "student", unique: [] }],
@@ -166,11 +166,12 @@ describe("saveData()", () => {
         relations: [
           {
             collectionName: "student",
-            localKey: "studentId",
+            localKey: "userId",
             foreignKey: "__id",
             as: "student",
             onDelete: "SET NULL",
             onUpdate: "CASCADE",
+            relationType: "hasOne",
           },
         ],
       };
@@ -182,7 +183,7 @@ describe("saveData()", () => {
         relations: [
           {
             collectionName: "student",
-            localKey: "studentId",
+            localKey: "userId",
             foreignKey: "_id",
             as: "students",
             onDelete: "NO ACTION",
@@ -195,7 +196,7 @@ describe("saveData()", () => {
       await (snapjson as SnapJson).createCollection(
         {
           collectionName: "user",
-          relations: { collectionName: "student", localKey: "studentId" },
+          relations: { collectionName: "student" },
         },
         true
       );

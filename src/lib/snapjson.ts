@@ -27,8 +27,6 @@ export class SnapJson {
       >
     >
   ) {
-    // console.log("snapjson", opt);
-
     this._opt = getOpts(opt);
   }
 

@@ -67,6 +67,16 @@ type RelationQueryOptionType = {
   limit?: number;
   select?: string | string[];
   match?: QueryType<Partial<Record<string, any>>>;
+  sort?: {
+    property?: string;
+    flag?: "asc" | "desc";
+  };
+  offset?: number;
+  include?:
+    | string
+    | string[]
+    | RelationQueryOptionType
+    | RelationQueryOptionType[];
 };
 
 type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
