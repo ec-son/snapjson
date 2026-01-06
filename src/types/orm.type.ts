@@ -202,7 +202,6 @@ type RelationType = {
   collectionName: string;
 
   /**
-   * For 'belongsTo' : the
    * The key in the current collection that holds the foreign key.
    *
    */

@@ -93,55 +93,64 @@ export class SnapJson {
       newCollectionInfo.createdAt = collection.createdAt || false;
       newCollectionInfo.updatedAt = collection.updatedAt || false;
 
-      const getRelations = (
-        relations: string | string[] | RelationType | RelationType[]
-      ): RelationType[] => {
-        if (!relations) return [];
-        if (!Array.isArray(relations)) relations = [relations as any];
-        const newRelations = [];
+      // const getRelations = (
+      //   relations: string | string[] | RelationType | RelationType[]
+      // ): RelationType[] => {
+      //   if (!relations) return [];
+      //   if (!Array.isArray(relations)) relations = [relations as any];
+      //   const newRelations = [];
 
-        for (const element of relations) {
-          let relation: RelationType;
-          if (typeof element === "string")
-            relation = { collectionName: element } as RelationType;
-          else relation = element;
+      //   for (const element of relations) {
+      //     let relation: RelationType;
+      //     if (typeof element === "string")
+      //       relation = { collectionName: element } as RelationType;
+      //     else relation = element;
 
-          if (relation.collectionName === collection.collectionName) continue;
-          if (
-            !collectionInfo.find(
-              (el) => el.collectionName === relation.collectionName
-            ) &&
-            !(collections as CreatingCollectionOptinType<T>[]).find(
-              (el) => el.collectionName === relation.collectionName
-            )
-          )
-            throw new Error(
-              `Collection '${relation.collectionName}' doesn't exist.`
-            );
+      //     if (relation.collectionName === collection.collectionName) continue;
+      //     if (
+      //       !collectionInfo.find(
+      //         (el) => el.collectionName === relation.collectionName
+      //       ) &&
+      //       !(collections as CreatingCollectionOptinType<T>[]).find(
+      //         (el) => el.collectionName === relation.collectionName
+      //       )
+      //     )
+      //       throw new Error(
+      //         `Collection '${relation.collectionName}' doesn't exist.`
+      //       );
 
-          relation.relationType ||= "hasOne";
-          relation.localKey ||= `${
-            relation.relationType === "belongsTo"
-              ? relation.collectionName
-              : collection.collectionName
-          }Id`;
+      //     relation.relationType ||= "hasOne";
+      //     relation.localKey ||= `${
+      //       relation.relationType === "belongsTo"
+      //         ? relation.collectionName
+      //         : collection.collectionName
+      //     }Id`;
 
-          const newRelation: RelationType = {
-            collectionName: relation.collectionName,
-            localKey: relation.localKey,
-            foreignKey: relation.foreignKey || "__id",
-            as: relation.as || relation.collectionName,
-            onDelete: relation.onDelete || "SET NULL",
-            onUpdate: relation.onUpdate || "CASCADE",
-            relationType: relation.relationType,
-          };
+      //     const newRelation: RelationType = {
+      //       collectionName: relation.collectionName,
+      //       localKey: relation.localKey,
+      //       foreignKey: relation.foreignKey || "__id",
+      //       as: relation.as || relation.collectionName,
+      //       onDelete: relation.onDelete || "SET NULL",
+      //       onUpdate: relation.onUpdate || "CASCADE",
+      //       relationType: relation.relationType,
+      //     };
 
-          newRelations.push(newRelation);
-        }
-        return newRelations;
-      };
+      //     newRelations.push(newRelation);
+      //   }
+      //   return newRelations;
+      // };
 
-      newCollectionInfo.relations = getRelations(collection?.relations);
+      newCollectionInfo.relations = this.getRelations(
+        collection.collectionName,
+        [
+          ...existedCollection,
+          ...(collections as CreatingCollectionOptinType<T>[]).map(
+            (el) => el.collectionName
+          ),
+        ],
+        collection?.relations
+      );
 
       if (collectionsTab.includes(newCollectionInfo.collectionName)) break;
       if (!newCollectionInfo.collectionName)
@@ -279,6 +288,150 @@ export class SnapJson {
    */
   async isExistCollection(collection: string): Promise<boolean> {
     return (await this.getCollections()).includes(collection);
+  }
+
+  async defineRelation(
+    targetCollectionName: string,
+    relation: string | string[] | RelationType | RelationType[],
+    edit?: boolean
+  ) {
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+    const existedCollection = await this.getCollections(collectionInfo);
+
+    if (!existedCollection.includes(targetCollectionName))
+      throw new Error(`Collection '${targetCollectionName}' doesn't exist.`);
+
+    const index = collectionInfo.findIndex(
+      (el) => el.collectionName === targetCollectionName
+    );
+    const collection = collectionInfo[index];
+
+    const relations = this.getRelations(
+      targetCollectionName,
+      existedCollection,
+      relation
+    );
+
+    for (const relation of relations) {
+      const index = collection.relations.findIndex(
+        (el) => el.collectionName === relation.collectionName
+      );
+
+      const oldRelation = collection.relations[index];
+      if (edit) {
+        if (!oldRelation)
+          throw new Error(
+            `Relation with this collection '${oldRelation.collectionName}' doesn't exist.`
+          );
+        collection.relations[index] = relation;
+      } else {
+        if (oldRelation)
+          throw new Error(
+            `Relation with this collection '${oldRelation.collectionName}' already exists.`
+          );
+        collection.relations.push(relation);
+      }
+    }
+
+    collectionInfo[index] = collection;
+    await this.saveData(collectionInfo, "collection-info");
+    return relations.map((el) => el.collectionName);
+  }
+
+  async getingRelation(collectionName: string) {
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+
+    const collection = collectionInfo.find(
+      (el) => el.collectionName === collectionName
+    );
+
+    if (!collection)
+      throw new Error(`Collection '${collectionName}' doesn't exist.`);
+
+    return collection.relations || [];
+  }
+
+  async deleteRelation(
+    parent: string,
+    childs: string | string[]
+  ): Promise<string[]> {
+    if (!Array.isArray(childs)) childs = [childs];
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+
+    const index = collectionInfo.findIndex(
+      (el) => el.collectionName === parent
+    );
+
+    const collection = collectionInfo[index];
+
+    if (!collection) throw new Error(`Collection '${parent}' doesn't exist.`);
+
+    const deletedRelation = [];
+    for (const child of childs) {
+      if (collection.relations.find((el) => el.collectionName === child))
+        deletedRelation.push(child);
+    }
+
+    const relations = collection.relations.filter(
+      (el) => !childs.includes(el.collectionName)
+    );
+
+    collection.relations = relations;
+
+    collectionInfo[index] = collection;
+    await this.saveData(collectionInfo, "collection-info");
+
+    return deletedRelation;
+  }
+
+  private getRelations(
+    targetCollection: string,
+    existedCollections: string[],
+    relations: string | string[] | RelationType | RelationType[]
+  ): RelationType[] {
+    if (!relations) return [];
+    if (!Array.isArray(relations)) relations = [relations as any];
+
+    const newRelations = [];
+
+    for (const element of relations) {
+      let relation: RelationType;
+      if (typeof element === "string")
+        relation = { collectionName: element } as RelationType;
+      else relation = element;
+
+      if (relation.collectionName === targetCollection) continue;
+      if (!existedCollections.find((el) => el === relation.collectionName))
+        throw new Error(
+          `Collection '${relation.collectionName}' doesn't exist.`
+        );
+
+      relation.relationType ||= "hasOne";
+      relation.localKey ||= `${
+        relation.relationType === "belongsTo"
+          ? relation.collectionName
+          : targetCollection
+      }Id`;
+
+      const newRelation: RelationType = {
+        collectionName: relation.collectionName,
+        localKey: relation.localKey,
+        foreignKey: relation.foreignKey || "__id",
+        as: relation.as || relation.collectionName,
+        onDelete: relation.onDelete || "SET NULL",
+        onUpdate: relation.onUpdate || "CASCADE",
+        relationType: relation.relationType,
+      };
+
+      newRelations.push(newRelation);
+    }
+    return newRelations;
   }
 
   /**
