@@ -16,12 +16,12 @@ export function encrypt(
   try {
     const iv = randomBytes(12);
     const key = scryptSync(secretKey, salt, 32);
-    const cipher = createCipheriv("aes-256-gcm", key, iv);
-    const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+    const cipher = createCipheriv("aes-256-gcm", key as any, iv as any);
+    const encrypted = Buffer.concat([cipher.update(text), cipher.final()] as any);
     const authTag = cipher.getAuthTag();
 
     return (
-      ENCRYPT_MARK + Buffer.concat([iv, authTag, encrypted]).toString("base64")
+      ENCRYPT_MARK + Buffer.concat([iv, authTag, encrypted] as any).toString("base64")
     );
   } catch (error) {
     throw new Error(
@@ -44,13 +44,13 @@ export function decrypt(
     const authTag = data.subarray(12, 28);
     const encrypted = data.subarray(28);
     const key = scryptSync(secretKey, salt, 32);
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
+    const decipher = createDecipheriv("aes-256-gcm", key as any, iv as any);
+    decipher.setAuthTag(authTag as any);
 
     const decrypted = Buffer.concat([
-      decipher.update(encrypted),
+      decipher.update(encrypted as any),
       decipher.final(),
-    ]);
+    ] as any);
     return decrypted.toString("utf8");
   } catch (error) {
     throw new Error(
