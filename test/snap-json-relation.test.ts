@@ -1,4 +1,4 @@
-import { DatabaseInfoOptionType } from "src/types/orm.type";
+import { DatabaseInfoOptionType } from "../src/types/orm.type";
 import { loadData } from "../src/utils/load-data";
 import { saveData } from "../src/utils/save-data";
 import { SnapJson } from "../src/lib/snapjson";
@@ -28,7 +28,7 @@ describe("snapJson relation", () => {
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   >;
 
-  let snapjson;
+  let snapjson: any;
   beforeEach(() => {
     snapjson = new SnapJson(mockOpts);
     (loadData as jest.Mock).mockClear();

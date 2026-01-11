@@ -142,7 +142,7 @@ describe("relation", () => {
           return structuredClone(mockDataBase.databaseInfo);
         else if (flag === "collection-info")
           return structuredClone(mockDataBase.collectionInfo);
-        else return structuredClone(mockDataBase.collectionData[flag]);
+        else return structuredClone((mockDataBase.collectionData as any)[flag]);
       })
     );
   });
@@ -219,7 +219,7 @@ describe("relation", () => {
                 ],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -261,7 +261,7 @@ describe("relation", () => {
                 ],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -303,7 +303,7 @@ describe("relation", () => {
                 relations: [],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -341,7 +341,7 @@ describe("relation", () => {
                 ],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -398,7 +398,7 @@ describe("relation", () => {
                 ],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -438,7 +438,7 @@ describe("relation", () => {
                 relations: [],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -477,7 +477,7 @@ describe("relation", () => {
                 relations: [],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -515,7 +515,7 @@ describe("relation", () => {
                 ],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 
@@ -635,7 +635,7 @@ describe("relation", () => {
                 relations: [],
               },
             ];
-          else return data[flag];
+          else return (data as any)[flag];
         })
       );
 

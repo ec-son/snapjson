@@ -1,9 +1,9 @@
+import { getOpts } from "../src/utils/opts.func";
+
 /**
  * getEnvBoolean
  * getOpts
  */
-
-import { getOpts } from "src/utils/opts.func";
 
 describe("opts", () => {
   it("should return opts set to env", () => {

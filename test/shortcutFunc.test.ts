@@ -3,10 +3,9 @@ import {
   createCollection,
   removeCollection,
   defineDocument,
-} from "src/utils/shortcutFunc";
+} from "../src/utils/shortcutFunc";
 import { SnapJson } from "../src/lib/snapjson";
-import { DatabaseInfoOptionType } from "src/types/orm.type";
-import { Document } from "src/lib/document";
+import { Document } from "../src/lib/document";
 
 const collection = jest.fn();
 const createCollectionMock = jest.fn();
@@ -57,6 +56,6 @@ describe("helper function", () => {
       splitFile: true,
     });
 
-    expect(documents[0]).toBeInstanceOf(Document);
+    expect((documents as any)[0]).toBeInstanceOf(Document);
   });
 });

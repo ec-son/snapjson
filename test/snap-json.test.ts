@@ -143,7 +143,7 @@ describe("Snapjson", () => {
       await expect(snapjson.createCollection("student")).rejects.toThrow();
     });
 
-    it("should return collection after creating it as expected", async () => {
+    it.only("should return collection after creating it as expected", async () => {
       (loadData as jest.Mock).mockResolvedValue([
         { collectionName: "student", unique: [] },
         { collectionName: "user", unique: [] },

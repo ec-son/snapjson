@@ -4,7 +4,7 @@ import { saveData } from "../src/utils/save-data";
 import { SnapJson } from "../src/lib/snapjson";
 import * as shortcutFunc from "../src/utils/shortcutFunc";
 import { DatabaseInfoOptionType } from "../src/types/orm.type";
-import { Document } from "src/lib/document";
+import { Document } from "../src/lib/document";
 
 jest.mock("src/utils/load-data", () => ({
   loadData: jest.fn(),
@@ -66,8 +66,8 @@ describe("Collection class", () => {
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   >;
 
-  let collection;
-  let defineDocument;
+  let collection: any
+  let defineDocument: any;
   const isNow = (date: string): boolean => {
     return (
       new Date(date).toISOString().split("T")[0] ===
