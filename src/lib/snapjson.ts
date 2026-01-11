@@ -69,7 +69,7 @@ export class SnapJson {
     let collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType[];
-    const existedCollection = await this.getCollections(collectionInfo);
+    const existedCollection = await this._getCollections(collectionInfo);
 
     const isArray = Array.isArray(collections);
     const collectionsTab: string[] = [];
@@ -95,7 +95,7 @@ export class SnapJson {
       }
 
       //setting Relations
-      newCollectionInfo.relations = this.getRelations(
+      newCollectionInfo.relations = this._getRelations(
         collection.collectionName,
         [
           ...existedCollection,
@@ -179,7 +179,8 @@ export class SnapJson {
         );
 
       collectionsTab.push(collectionName);
-      removeFile(join(this._opt.path_db, collectionName));
+      if (this._opt.splitFile)
+        removeFile(join(this._opt.path_db, collectionName));
       const index = collectionInfo.findIndex(
         (collection) => collection.collectionName === collectionName
       );
@@ -214,7 +215,7 @@ export class SnapJson {
   /**
    *  Returns an array of collection names
    */
-  async getCollections(
+  private async _getCollections(
     collectionInfo?: CollectionInfoType[]
   ): Promise<string[]> {
     if (!collectionInfo)
@@ -222,6 +223,10 @@ export class SnapJson {
         "collection-info"
       )) as CollectionInfoType[];
     return collectionInfo.map((collection) => collection.collectionName);
+  }
+
+  async getCollections(): Promise<string[]> {
+    return this._getCollections();
   }
 
   /**
@@ -241,7 +246,7 @@ export class SnapJson {
    * }
    */
   async isExistCollection(collection: string): Promise<boolean> {
-    return (await this.getCollections()).includes(collection);
+    return (await this._getCollections()).includes(collection);
   }
 
   async defineRelation(
@@ -252,7 +257,7 @@ export class SnapJson {
     let collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType[];
-    const existedCollection = await this.getCollections(collectionInfo);
+    const existedCollection = await this._getCollections(collectionInfo);
 
     if (!existedCollection.includes(targetCollectionName))
       throw new Error(`Collection '${targetCollectionName}' doesn't exist.`);
@@ -262,7 +267,7 @@ export class SnapJson {
     );
     const collection = collectionInfo[index];
 
-    const relations = this.getRelations(
+    const relations = this._getRelations(
       targetCollectionName,
       existedCollection,
       relation
@@ -294,7 +299,7 @@ export class SnapJson {
     return relations.map((el) => el.collectionName);
   }
 
-  async getingRelation(collectionName: string) {
+  async getRelations(collectionName: string) {
     let collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType[];
@@ -310,30 +315,32 @@ export class SnapJson {
   }
 
   async deleteRelation(
-    parent: string,
-    childs: string | string[]
+    targetCollectionName: string,
+    sourceCollections: string | string[]
   ): Promise<string[]> {
-    if (!Array.isArray(childs)) childs = [childs];
+    if (!Array.isArray(sourceCollections))
+      sourceCollections = [sourceCollections];
     let collectionInfo = (await this.loadData(
       "collection-info"
     )) as CollectionInfoType[];
 
     const index = collectionInfo.findIndex(
-      (el) => el.collectionName === parent
+      (el) => el.collectionName === targetCollectionName
     );
 
     const collection = collectionInfo[index];
 
-    if (!collection) throw new Error(`Collection '${parent}' doesn't exist.`);
+    if (!collection)
+      throw new Error(`Collection '${targetCollectionName}' doesn't exist.`);
 
     const deletedRelation = [];
-    for (const child of childs) {
+    for (const child of sourceCollections) {
       if (collection.relations.find((el) => el.collectionName === child))
         deletedRelation.push(child);
     }
 
     const relations = collection.relations.filter(
-      (el) => !childs.includes(el.collectionName)
+      (el) => !sourceCollections.includes(el.collectionName)
     );
 
     collection.relations = relations;
@@ -344,7 +351,7 @@ export class SnapJson {
     return deletedRelation;
   }
 
-  private getRelations(
+  private _getRelations(
     targetCollection: string,
     existedCollections: string[],
     relations: string | string[] | RelationType | RelationType[]
