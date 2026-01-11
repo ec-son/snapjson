@@ -3,36 +3,25 @@ import { removeFile, sizeFile } from "../utils/utils.func";
 import {
   CollectionInfoType,
   CollectionType,
+  CreatingCollectionOptinType,
+  DatabaseConfigType,
   DatabaseInfoOptionType,
   OrmInfoType,
+  RelationType,
 } from "../types/orm.type";
 import { loadData } from "../utils/load-data";
 import { saveData } from "../utils/save-data";
 import { join } from "path";
+import { getOpts } from "../utils/opts.func";
 
 export class SnapJson {
   private _opt: Pick<
     DatabaseInfoOptionType,
     Exclude<keyof DatabaseInfoOptionType, "flag">
-  > = { path_db: "db", mode: "dev", splitFile: false };
+  >;
 
-  constructor(
-    opt?: Partial<
-      Pick<
-        DatabaseInfoOptionType,
-        Exclude<keyof DatabaseInfoOptionType, "flag">
-      >
-    >
-  ) {
-    if (opt) {
-      this._opt.path_db = opt.path_db || "db";
-      this._opt.mode = opt.mode || "dev";
-      this._opt.splitFile = opt.splitFile || false;
-      this._opt.encrypted = opt.encrypted || false;
-      // if (opt.encrypted) throw new Error("errrrrrr"); //todo message here od english
-      this._opt.secretKey = opt.secretKey;
-      this._opt.salt = opt.salt;
-    }
+  constructor(opt?: DatabaseConfigType) {
+    this._opt = getOpts(opt);
   }
 
   /**
@@ -47,10 +36,8 @@ export class SnapJson {
    * @param {boolean} force [force=false] If true, existing collection with the same name will be overwritten.
    * @returns Collection instance.
    */
-  async createCollection<T extends Object>(
-    collection:
-      | string
-      | { collectionName: string; uniqueKeys?: Array<keyof T> },
+  async createCollection<T>(
+    collection: string | CreatingCollectionOptinType<T>,
     force?: boolean
   ): Promise<Collection<T>> {
     return this.creatingCollection<T>(collection, force) as Promise<
@@ -66,10 +53,8 @@ export class SnapJson {
    * @param force [force=false] If true, existing collection with the same name will be overwritten.
    * @returns An array of collection instances
    */
-  async createCollections<T extends Object>(
-    collections:
-      | string[]
-      | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
+  async createCollections<T>(
+    collections: string[] | CreatingCollectionOptinType<T>[],
     force?: boolean
   ): Promise<Collection<T>[]> {
     return this.creatingCollection<T>(collections, force) as Promise<
@@ -77,7 +62,7 @@ export class SnapJson {
     >;
   }
 
-  private async creatingCollection<T extends Object>(
+  private async creatingCollection<T>(
     collections: any,
     force?: boolean
   ): Promise<Collection<T> | Collection<T>[]> {
@@ -90,37 +75,64 @@ export class SnapJson {
     const collectionsTab: string[] = [];
     if (!Array.isArray(collections)) collections = [collections];
 
-    for (const collection of collections) {
-      let name: string = "";
-      let unique: string[] = [];
+    for (let collection of collections as CreatingCollectionOptinType<T>[]) {
+      const newCollectionInfo: CollectionInfoType = { collectionName: "" };
 
-      if (typeof collection === "object") {
-        name = collection["collectionName"];
-        unique = (collection["uniqueKeys"] as Array<any>) || [];
-      } else name = collection;
+      if (typeof collection === "string")
+        collection = { collectionName: collection };
 
-      if (collectionsTab.includes(name)) return;
-      if (!name) throw new Error(`Connot create collection of undefined.`);
+      // setting collection info
+      newCollectionInfo.collectionName = collection.collectionName;
+      newCollectionInfo.idStrategy = collection.idStrategy || "increment";
+      newCollectionInfo.unique = [] as any[];
+      newCollectionInfo.createdAt = collection.createdAt || false;
+      newCollectionInfo.updatedAt = collection.updatedAt || false;
 
-      if ("__metadata__" === name)
-        throw new Error(`Connot create collection with '${name}' name.`);
-
-      if (existedCollection.includes(name) && !force)
-        throw new Error(`Collection '${name}' already exists.`);
-      else if (existedCollection.includes(name)) {
-        collectionInfo = collectionInfo.filter(
-          (el) => el.collectionName !== name
-        );
-        await saveData([], { ...this._opt, flag: name });
+      // removal of duplicates
+      for (const uniqueKey of collection.uniqueKeys || []) {
+        if (!newCollectionInfo.unique.includes(uniqueKey as any))
+          newCollectionInfo.unique.push(uniqueKey as any);
       }
 
-      collectionInfo.push({
-        collectionName: name,
-        unique,
-      });
-      collectionsTab.push(name);
-    }
+      //setting Relations
+      newCollectionInfo.relations = this.getRelations(
+        collection.collectionName,
+        [
+          ...existedCollection,
+          ...(collections as CreatingCollectionOptinType<T>[]).map(
+            (el) => el.collectionName
+          ),
+        ],
+        collection?.relations
+      );
 
+      if (collectionsTab.includes(newCollectionInfo.collectionName)) break;
+      if (!newCollectionInfo.collectionName)
+        throw new Error(`Connot create collection of undefined.`);
+
+      if ("__metadata__" === newCollectionInfo.collectionName)
+        throw new Error(`Connot create collection with '${name}' name.`);
+
+      if (
+        existedCollection.includes(newCollectionInfo.collectionName) &&
+        !force
+      )
+        throw new Error(
+          `Collection '${newCollectionInfo.collectionName}' already exists.`
+        );
+      else if (existedCollection.includes(newCollectionInfo.collectionName)) {
+        collectionInfo = collectionInfo.filter(
+          (el) => el.collectionName !== newCollectionInfo.collectionName
+        );
+        await saveData([], {
+          ...this._opt,
+          flag: newCollectionInfo.collectionName,
+        });
+      }
+
+      collectionInfo.push(newCollectionInfo);
+      collectionsTab.push(newCollectionInfo.collectionName);
+    }
     if (collectionsTab.length > 0)
       await this.saveData(collectionInfo, "collection-info");
 
@@ -187,7 +199,7 @@ export class SnapJson {
    * @returns {Object} Instance of the specified collection if found.
    * @throws If the collection is not found, an error will be thrown.
    */
-  async collection<T extends Object>(
+  async collection<T>(
     collectionName: string,
     force: boolean = false
   ): Promise<Collection<T>> {
@@ -230,6 +242,150 @@ export class SnapJson {
    */
   async isExistCollection(collection: string): Promise<boolean> {
     return (await this.getCollections()).includes(collection);
+  }
+
+  async defineRelation(
+    targetCollectionName: string,
+    relation: string | string[] | RelationType | RelationType[],
+    edit?: boolean
+  ) {
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+    const existedCollection = await this.getCollections(collectionInfo);
+
+    if (!existedCollection.includes(targetCollectionName))
+      throw new Error(`Collection '${targetCollectionName}' doesn't exist.`);
+
+    const index = collectionInfo.findIndex(
+      (el) => el.collectionName === targetCollectionName
+    );
+    const collection = collectionInfo[index];
+
+    const relations = this.getRelations(
+      targetCollectionName,
+      existedCollection,
+      relation
+    );
+
+    for (const relation of relations) {
+      const index = collection.relations.findIndex(
+        (el) => el.collectionName === relation.collectionName
+      );
+
+      const oldRelation = collection.relations[index];
+      if (edit) {
+        if (!oldRelation)
+          throw new Error(
+            `Relation with this collection '${oldRelation.collectionName}' doesn't exist.`
+          );
+        collection.relations[index] = relation;
+      } else {
+        if (oldRelation)
+          throw new Error(
+            `Relation with this collection '${oldRelation.collectionName}' already exists.`
+          );
+        collection.relations.push(relation);
+      }
+    }
+
+    collectionInfo[index] = collection;
+    await this.saveData(collectionInfo, "collection-info");
+    return relations.map((el) => el.collectionName);
+  }
+
+  async getingRelation(collectionName: string) {
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+
+    const collection = collectionInfo.find(
+      (el) => el.collectionName === collectionName
+    );
+
+    if (!collection)
+      throw new Error(`Collection '${collectionName}' doesn't exist.`);
+
+    return collection.relations || [];
+  }
+
+  async deleteRelation(
+    parent: string,
+    childs: string | string[]
+  ): Promise<string[]> {
+    if (!Array.isArray(childs)) childs = [childs];
+    let collectionInfo = (await this.loadData(
+      "collection-info"
+    )) as CollectionInfoType[];
+
+    const index = collectionInfo.findIndex(
+      (el) => el.collectionName === parent
+    );
+
+    const collection = collectionInfo[index];
+
+    if (!collection) throw new Error(`Collection '${parent}' doesn't exist.`);
+
+    const deletedRelation = [];
+    for (const child of childs) {
+      if (collection.relations.find((el) => el.collectionName === child))
+        deletedRelation.push(child);
+    }
+
+    const relations = collection.relations.filter(
+      (el) => !childs.includes(el.collectionName)
+    );
+
+    collection.relations = relations;
+
+    collectionInfo[index] = collection;
+    await this.saveData(collectionInfo, "collection-info");
+
+    return deletedRelation;
+  }
+
+  private getRelations(
+    targetCollection: string,
+    existedCollections: string[],
+    relations: string | string[] | RelationType | RelationType[]
+  ): RelationType[] {
+    if (!relations) return [];
+    if (!Array.isArray(relations)) relations = [relations as any];
+
+    const newRelations = [];
+
+    for (const element of relations) {
+      let relation: RelationType;
+      if (typeof element === "string")
+        relation = { collectionName: element } as RelationType;
+      else relation = element;
+
+      if (relation.collectionName === targetCollection) continue;
+      if (!existedCollections.find((el) => el === relation.collectionName))
+        throw new Error(
+          `Collection '${relation.collectionName}' doesn't exist.`
+        );
+
+      relation.relationType ||= "hasOne";
+      relation.localKey ||= `${
+        relation.relationType === "belongsTo"
+          ? relation.collectionName
+          : targetCollection
+      }Id`;
+
+      const newRelation: RelationType = {
+        collectionName: relation.collectionName,
+        localKey: relation.localKey,
+        foreignKey: relation.foreignKey || "__id",
+        as: relation.as || relation.collectionName,
+        onDelete: relation.onDelete || "SET NULL",
+        onUpdate: relation.onUpdate || "CASCADE",
+        relationType: relation.relationType,
+      };
+
+      newRelations.push(newRelation);
+    }
+    return newRelations;
   }
 
   /**

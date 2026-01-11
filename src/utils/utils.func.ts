@@ -1,6 +1,10 @@
 import { join } from "path";
 import { stat, rm } from "node:fs/promises";
-import { CollectionInfoType, DatabaseInfoOptionType } from "../types/orm.type";
+import {
+  CollectionInfoType,
+  DatabaseInfoOptionType,
+  RelationType,
+} from "../types/orm.type";
 import { decrypt, encrypt } from "./cryptoUtil";
 import { loadData } from "./load-data";
 

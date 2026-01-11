@@ -62,6 +62,23 @@ type MetadataType = {
   collectionInfo: Array<{ collectionName: string; unique: Array<string> }>;
 };
 
+type RelationQueryOptionType = {
+  collectionName: string;
+  limit?: number;
+  select?: string | string[];
+  match?: QueryType<Partial<Record<string, any>>>;
+  sort?: {
+    property?: string;
+    flag?: "asc" | "desc";
+  };
+  offset?: number;
+  include?:
+    | string
+    | string[]
+    | RelationQueryOptionType
+    | RelationQueryOptionType[];
+};
+
 type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
   ? {
       limit?: number;
@@ -71,6 +88,12 @@ type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         flag?: "asc" | "desc";
       };
       offset?: number;
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     }
   : {
       limit?: number;
@@ -80,6 +103,12 @@ type QueryOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         flag?: "asc" | "desc";
       };
       offset?: number;
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     };
 
 type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
@@ -89,6 +118,12 @@ type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         property?: keyof T;
         flag?: "asc" | "desc";
       };
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     }
   : {
       select?: Array<keyof TSelect>;
@@ -96,6 +131,12 @@ type QueryOneOptionType<T, TSelect = T> = TSelect extends (infer U)[]
         property?: keyof T;
         flag?: "asc" | "desc";
       };
+      include?:
+        | string
+        | string[]
+        | RelationQueryOptionType
+        | RelationQueryOptionType[];
+      type?: "document" | "object" | "json";
     };
 
 interface DataBaseType {
@@ -105,8 +146,27 @@ interface DataBaseType {
 type OrmInfoType = { splitFile: boolean };
 
 type CollectionInfoType = {
+  /**
+   * Name of the collection
+   */
   collectionName: string;
-  unique: Array<string>;
+  /**
+   * Choose between `"increment" (default) and `"uuid"`
+   */
+  idStrategy?: "uuid" | "increment";
+  /**
+   * Defines one or more unique key constraints for the collection.
+   */
+  unique?: Array<string>;
+  /**
+   * Enables automatic creation timestamp. Defaults to false
+   */
+  createdAt?: boolean;
+  /**
+   * Enables automatic update timestamp. Defaults to false
+   */
+  updatedAt?: boolean;
+  relations?: RelationType[];
 };
 
 type CollectionType<T> = Array<T>;
@@ -132,6 +192,91 @@ type DatabaseInfoOptionType = {
   mode?: "dev" | "prod";
 };
 
+type DatabaseConfigType = {
+  path_db?: string;
+  splitFile?: boolean; // Each collection is stored in its own file
+  encrypted?: boolean; // Each collection is encrypted
+  secretKey?: string;
+  salt?: string;
+  mode?: "dev" | "prod";
+};
+
+/**
+ * Defines a relationship between collections in the ORM
+ */
+type RelationType = {
+  /**
+   * The name of the related (target) collection
+   */
+  collectionName: string;
+
+  /**
+   * The key in the current collection that holds the foreign key.
+   *
+   */
+  localKey?: string;
+
+  /**
+   * The key in the target collection that the localKey references, __id is default value
+   */
+  foreignKey?: string;
+
+  /**
+   * Optional alias to access the related data (e.g., 'author' for a user relation), collectionName is default value.
+   */
+  as?: string;
+
+  /**
+   * Type of relationship between this collection and the target collection. hasOne is default value.
+   * - 'belongsTo': This collection belongs to the target collection.
+   * - 'hasOne': This collection is referenced by one document in the target collection.
+   * - 'hasMany': This collection is referenced by multiple documents in the target collection.
+   */
+  relationType?: "belongsTo" | "hasOne" | "hasMany";
+
+  /**
+   * Action to take when related record is deleted. SET NULL is default value.
+   * - 'CASCADE': delete this record too.
+   * - 'SET NULL': set the localKey to null.
+   * - 'RESTRICT': prevent deletion if relation exists.
+   * - 'NO ACTION': do nothing.
+   */
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+
+  /**
+   * Action to take when the foreignKey is updated. CASCADE is default value.
+   * - 'CASCADE': update the localKey accordingly.
+   * - 'SET NULL': set the localKey to null.
+   * - 'RESTRICT': prevent update if relation exists.
+   * - 'NO ACTION': do nothing.
+   */
+  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+};
+
+type CreatingCollectionOptinType<T> = {
+  /**
+   * Name of the collection
+   */
+  collectionName: string;
+  /**
+   * Choose between `"increment" (default) and `"uuid"`
+   */
+  idStrategy?: "uuid" | "increment";
+  /**
+   * Defines one or more unique key constraints for the collection.
+   */
+  uniqueKeys?: Array<keyof T>;
+  /**
+   * Enables automatic creation timestamp. Default value is false.
+   */
+  createdAt?: boolean;
+  /**
+   * Enables automatic update timestamp. Default value is false.
+   */
+  updatedAt?: boolean;
+  relations?: string | string[] | RelationType | RelationType[];
+};
+
 export {
   OrmInfoType,
   CollectionInfoType,
@@ -144,4 +289,8 @@ export {
   CollectionType,
   DataBaseType,
   DatabaseInfoOptionType,
+  DatabaseConfigType,
+  CreatingCollectionOptinType,
+  RelationType,
+  RelationQueryOptionType,
 };

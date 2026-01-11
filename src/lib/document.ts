@@ -9,7 +9,7 @@ export class Document<T extends Object> {
   [key: string]: any;
   private privateProps = [
     "collectionName",
-    "path_id",
+    "path_db",
     "document",
     "id",
     "collection",
@@ -26,7 +26,7 @@ export class Document<T extends Object> {
   constructor(
     private document: T,
     private collectionName: string,
-    opt?: Partial<
+    opt: Partial<
       Pick<
         DatabaseInfoOptionType,
         Exclude<keyof DatabaseInfoOptionType, "flag">
@@ -43,16 +43,7 @@ export class Document<T extends Object> {
       document = rest;
     }
 
-    if (opt) {
-      this._opt.path_db = opt.path_db;
-      this._opt.mode = opt.mode;
-      this._opt.splitFile = opt.splitFile;
-      this._opt.encrypted = opt.encrypted;
-      // if (opt.encrypted) throw new Error("errrrrrr"); //todo message here od english
-      this._opt.secretKey = opt.secretKey;
-      this._opt.salt = opt.salt;
-    }
-    this._opt.flag = collectionName;
+    this._opt = { ...(opt as any), flag: collectionName };
   }
 
   /**
@@ -87,8 +78,8 @@ export class Document<T extends Object> {
   }
 
   /**
-   * Updates this document.
-   * @returns Returns true if the document is successfully updated, false otherwise.
+   * Saves this document.
+   * @returns Returns true if the document is successfully saved, false otherwise.
    */
   async save() {
     await this.init();
@@ -109,6 +100,41 @@ export class Document<T extends Object> {
       (await this.collection?.updateOne(data, { __id: this.id } as any)) !==
       null
     );
+  }
+
+  /**
+   * Updates this document.
+   *
+   * Updates the properties of the document and updates the document in the database if the `save` flag is set to true.
+   *
+   * @param obj - The properties to update.
+   * @param save - If true the document will be saved in the database.
+   * @returns - Returns true if the document is successfully updated, false otherwise.
+   */
+  async update(obj: Partial<T>, save?: boolean): Promise<boolean> {
+    const { __id, ...rest } = obj as any;
+    obj = rest;
+    if (!obj && Object.keys(obj).length < 1) return true;
+
+    // updating properties
+    for (const key of Object.keys(obj)) {
+      if (
+        Object.keys(this.document).includes(key) &&
+        !isEqual(this.document[key], obj[key])
+      ) {
+        // updating the document properties
+        this.document[key] = obj[key];
+        // updating the document object properties
+        this[key] = obj[key] as any;
+      }
+    }
+
+    if (save) {
+      // saving the updated document to the database
+      return await this.save();
+    }
+
+    return true;
   }
 
   /**

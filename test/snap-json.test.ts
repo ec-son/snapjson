@@ -27,7 +27,7 @@ jest.mock("../src/utils/utils.func");
  * size
  */
 
-describe("saveData()", () => {
+describe("Snapjson", () => {
   const mockDataBase = {
     databaseInfo: { splitFile: false },
     collectionInfo: [{ collectionName: "student", unique: [] }],
@@ -45,7 +45,7 @@ describe("saveData()", () => {
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   >;
 
-  let snapjson;
+  let snapjson: any;
   beforeEach(() => {
     snapjson = new SnapJson(mockOpts);
     (loadData as jest.Mock).mockClear();
@@ -141,6 +141,84 @@ describe("saveData()", () => {
 
     it("should throw an error when creating a new collection instance if collection already exist", async () => {
       await expect(snapjson.createCollection("student")).rejects.toThrow();
+    });
+
+    it("should return collection after creating it as expected", async () => {
+      (loadData as jest.Mock).mockResolvedValue([
+        { collectionName: "student", unique: [] },
+        { collectionName: "user", unique: [] },
+      ]);
+
+      const expected1 = {
+        collectionName: "student",
+        createdAt: false,
+        idStrategy: "increment",
+        relations: [],
+        unique: [],
+        updatedAt: false,
+      };
+      const expected2 = {
+        collectionName: "user",
+        idStrategy: "increment",
+        unique: [],
+        createdAt: false,
+        updatedAt: false,
+        relations: [
+          {
+            collectionName: "student",
+            localKey: "userId",
+            foreignKey: "__id",
+            as: "student",
+            onDelete: "SET NULL",
+            onUpdate: "CASCADE",
+            relationType: "hasOne",
+          },
+        ],
+      };
+      const expected3: any = {
+        collectionName: "user",
+        idStrategy: "uuid",
+        createdAt: true,
+        updatedAt: true,
+        relations: [
+          {
+            collectionName: "student",
+            localKey: "userId",
+            foreignKey: "_id",
+            as: "students",
+            onDelete: "NO ACTION",
+            onUpdate: "SET DEFAULT",
+          },
+        ],
+      };
+
+      await snapjson.createCollection("student", true);
+      await (snapjson as SnapJson).createCollection(
+        {
+          collectionName: "user",
+          relations: { collectionName: "student" },
+        },
+        true
+      );
+      await (snapjson as SnapJson).createCollection(
+        { ...expected3, uniqueKeys: ["email"] },
+        true
+      );
+      await (snapjson as SnapJson).createCollection(
+        {
+          collectionName: "user",
+          relations: "student",
+        },
+        true
+      );
+
+      expect((saveData as jest.Mock).mock.calls[1][0][1]).toEqual(expected1);
+      expect((saveData as jest.Mock).mock.calls[3][0][1]).toEqual(expected2);
+      expect((saveData as jest.Mock).mock.calls[5][0][1]).toEqual({
+        ...expected3,
+        unique: ["email"],
+      });
+      expect((saveData as jest.Mock).mock.calls[7][0][1]).toEqual(expected2);
     });
 
     it("should remove collection from database", async () => {

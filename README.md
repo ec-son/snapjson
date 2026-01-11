@@ -28,25 +28,32 @@
   - [Additional methods](#additional-methods)
     - [SnapJson class](#snapjson-class)
     - [Collection class](#collection-class)
-- [Operators](#operators)
-  - [Comparison Operators](#comparison-operators)
-    - [$eq Operator](#eq-operator)
-    - [$ne Operator](#ne-operator)
-    - [$gt Operator](#gt-operator)
-    - [$lt Operator](#lt-operator)
-    - [$gte Operator](#gte-operator)
-    - [$lte Operator](#lte-operator)
-    - [$in Operator](#in-operator)
-    - [$nin Operator](#nin-operator)
-  - [Logical Operators](#logical-operators)
-    - [$and Operator](#and-operator)
-    - [$or Operator](#or-operator)
-  - [Array Operators](#array-operators)
-    - [Basic query](#basic-query)
-    - [$eq and $ne operators](#eq-and-ne-operators)
-    - [$contains operator](#contains-operator)
-    - [$nocontains operator](#nocontains-operator)
-- [Working with Regular Expressions](#working-with-regular-expressions)
+- [Advanced Usage](#advanced-usage)
+  - [Defining Relations Between Collection](#defining-relations-between-collection)
+    - [Overview](#overview)
+    - [Relations Syntax](#relations-syntax)
+    - [Supported Relation Types](#supported-relation-types)
+    - [Relation Options](#relation-options)
+    - [Using Relation in Queries](#using-relation-in-queries)
+  - [Using Query Operators](#using-query-operators)
+    - [Comparison Operators](#comparison-operators)
+      - [$eq Operator](#eq-operator)
+      - [$ne Operator](#ne-operator)
+      - [$gt Operator](#gt-operator)
+      - [$lt Operator](#lt-operator)
+      - [$gte Operator](#gte-operator)
+      - [$lte Operator](#lte-operator)
+      - [$in Operator](#in-operator)
+      - [$nin Operator](#nin-operator)
+    - [Logical Operators](#logical-operators)
+      - [$and Operator](#and-operator)
+      - [$or Operator](#or-operator)
+    - [Array Operators](#array-operators)
+      - [Basic query](#basic-query)
+      - [$eq and $ne operators](#eq-and-ne-operators)
+      - [$contains operator](#contains-operator)
+      - [$nocontains operator](#nocontains-operator)
+  - [Working with Regular Expressions](#working-with-regular-expressions)
 - [Reporting Issues](#reporting-issues)
 - [License](#license)
 
@@ -82,10 +89,46 @@ import { SnapJson, createCollection } from "snapjson";
 
 ### Creating an instance of `SnapJson`
 
+To use SnapJson, you need to create an instance of the class. You can configure it by passing an options object or by using environment variables.
+
+#### 🔹 Option 1: Using a configuration object
+
 ```typescript
-const path = ""; // path of JSON file
-const orm = new SnapJson(path);
+const config = {
+  path_db: "db",
+};
+const orm = new SnapJson(config);
 ```
+
+Available Options
+
+| Option    | Type               | Default   | Description                                            |
+| --------- | ------------------ | --------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| path_db   | string (optional)  | "db"      | Directory where JSON data will be stored               |
+| splitFile | boolean (optional) | false     | If **true**, each collection is stored in its own file |
+| encrypted | boolean (optional) | false     | It **true**, data will be encrypted                    |
+| secretKey | string (optional)  | undefined | Key used for encryption                                |
+| salt      | string (optional)  | undefined | Optional salt for additional encryption security       |
+| mode      | "dev" \\           | "prod"    | "dev"                                                  | Defines the working mode (development or production) |
+
+#### 🔹 Option 1: Using environment variables
+
+SnapJson also supports environment variables for configuration. If environment variables are set, you can instantiate SnapJson without passing any config object.
+
+```typescript
+const orm = new SnapJson();
+```
+
+Available Options
+
+| Variable Name      | Default       | Description                                                                    |
+| ------------------ | ------------- | ------------------------------------------------------------------------------ | ------------ |
+| SNAPJSON_PATH_DB   | "db"          | Directory where JSON data will be stored                                       |
+| SNAPJSON_SPLITFILE | "false"       | If **true**, each collection is stored in its own file                         |
+| SNAPJSON_ENCRYPTED | "false"       | It **true**, data will be encrypted                                            |
+| SNAPJSON_SECRETKEY | " "           | Key used for encryption                                                        |
+| SNAPJSON_SALT      | " "           | Optional salt for additional encryption security                               |
+| NODE_ENV           | "environment" | Defines the working mode (development or production). values: `environment` \\ | `production` |
 
 ### Defining the data schema
 
@@ -118,13 +161,29 @@ const collection = await orm.createCollection({
 });
 ```
 
+#### Collection Configuration Options
+
+| Property       | Description                                                 |
+| -------------- | ----------------------------------------------------------- |
+| collectionName | Name of the collection                                      |
+| uniqueKeys     | Defines all properties that will be unique.                 |
+| idStrategy     | Defines how document IDs are generated. (uuid et increment) |
+| createdAt      | Date when the document was first created                    |
+| updatedAt      | Date when the document was last updated.                    |
+
 Alternatively, you can use a shortcut helper function:
 
 ```typescript
 // Instead of orm.createCollection and orm.createCollections, you can use: createCollection function, imported from snapjson.
-// createCollection<T>(collection: string | { collectionName: string; uniqueKeys?: Array<keyof T>; }, path?: string, force?: boolean), default path is db/db.json
+// createCollection<T>(collection: string | { collectionName: string; uniqueKeys?: Array<keyof T>; }, opts?: {...,force?: boolean}).
 const collection = await createCollection("user");
-const collections = await createCollection(["user", "teacher"]);
+
+const config = {
+  path_db: "id",
+  splitFile: true,
+  mode: "dev",
+};
+const collections = await createCollection(["user", "teacher"], config);
 ```
 
 ### Defining a collection
@@ -135,8 +194,12 @@ To define a collection, you have three methods available:
 
 ```typescript
 import { SnapJson } from "snapjson";
-const path = ""; // default path is db/db.json
-const orm = new SnapJson(path);
+const config = {
+  path_db: "id",
+  splitFile: true,
+  mode: "dev",
+};
+const orm = new SnapJson(config);
 const usersCollection = await orm.collection<UserSchema>("user");
 
 const usersCollection = await orm.collection<UserSchema>("user", true); // create collection 'user' when it doesn't exist.
@@ -148,18 +211,28 @@ This will return an instance of this collection if it exists, otherwise, an erro
 
 ```typescript
 import { defineCollection } from "snapjson";
-const path = ""; // default path is db/db.json
-const usersCollection = await defineCollection<UserSchema>("user", path);
+const config = {
+  path_db: "id",
+  splitFile: true,
+  mode: "dev",
+  force: true, // If true, create collection 'user' when it doesn't exist.
+};
+const usersCollection = await defineCollection<UserSchema>("user", config);
 
-const usersCollection = await defineCollection<UserSchema>("user", path, true); // create collection 'user' when it doesn't exist.
+const usersCollection = await defineCollection<UserSchema>("user", config);
 ```
 
 #### Method 3: Using the Collection Class
 
 ```typescript
 import { Collection } from "snapjson";
-const path = ""; // default path is db/db.json
-const usersCollection = new Collection<UserSchema>("user", path);
+const config = {
+  path_db: "id",
+  splitFile: true,
+  mode: "dev",
+  force: true, // If true, create collection 'user' when it doesn't exist.
+};
+const usersCollection = new Collection<UserSchema>("user", config);
 ```
 
 The key difference between these methods is in their verification timing. The first and second method check if the collection exists before instantiation, while the third method checks upon execution of query methods such as `find`, `findOne`, and more.
@@ -173,7 +246,7 @@ const collections = await orm.removeCollection(["teacher", "student"]);
 console.log(collections); // [ 'teacher', 'student' ]
 
 // Or
-// removeCollection(collections: string | string[], path?: string, force?: boolean), default path is db/db.json
+// removeCollection(collections: string | string[], opts?: {...,force?: boolean})
 await removeCollection("user");
 await removeCollection(["teacher", "student"]);
 ```
@@ -334,15 +407,25 @@ if (user) console.log(user.toObject());
 
 ### Document methods
 
+The Document object provides several methods for manipulating the properties of the document:
+
+| Name     | Description                                                                          |
+| -------- | ------------------------------------------------------------------------------------ |
+| delete   | Deletes the document from the collection.                                            |
+| save     | Saves the changes to the document.                                                   |
+| toJSON   | Converts the document into JSON.                                                     |
+| toObject | Converts the document into a plain object.                                           |
+| update   | Updates the document. If the `save` flag is set to true, the document will be saved. |
+
 ```typescript
 const user = await usersCollection.findById(1);
 
 if (user) {
-  console.log(user.toObject()); // Convert document into a plain object.
-  console.log(user.toJSON()); // Convert document into JSON.
+  console.log(user.toObject());
+  console.log(user.toJSON());
   user.age = 10;
-  await user.save(); // Save the changes to the document
-  await user.delete(); // Delete the document from the collection
+  await user.save();
+  await user.delete();
 }
 ```
 
@@ -367,7 +450,7 @@ console.log(isExists); // true
 const databaseSize = await orm.size(); // Returns the size of the database file.
 console.log(databaseSize); // 58 KB
 
-console.log(orm.pathDB); // db/db.json
+console.log(orm.pathDB); // db/
 ```
 
 #### Collection class
@@ -422,7 +505,135 @@ console.log(id); // 3
 // add and create methods are aliases for insertOne method
 ```
 
-## Operators
+## Advanced Usage
+
+### Defining Relations Between Collection
+
+#### Overview
+
+SnapJson now supports joining collections, enabling developers to define relationships between JSON-based data structures, similar to joins in relational databases – but tailored for NoSQL-like flexibility.
+
+With this feature, you can link documents across collections using a reference key, retrieve related data effortlessly, and keep your logic clean and organized. Whether you're working with embedded references or external collection links, SnapJson makes it easy to simulate relational behavior in a JSON environment.
+
+This is especially useful for scenarios where your data is stored in separate collections but logically connected – like users and posts, categories and products, or invoices and clients.
+
+#### Relations Syntax
+
+You can define relations at collection creation using the **relations** property.
+
+```typescript
+relations: {
+  collectionName: string;       // Name of the related collection (e.g., "user")
+  localKey?: string;            // Field in the current collection (default: `{parent name}Id`)
+  foreignKey?: string;          // Field in the related collection (default: "__id")
+  as?: string;                  // Alias name for the relation (default: parent name)
+  relationType?: "belongsTo" | "hasOne" | "hasMany"; // Default: "hasOne"
+  onUpdate?: "cascade" | "set null" | "restrict" | "no action"; // Default: "cascade"
+  onDelete?: "cascade" | "set null" | "restrict" | "no action"; // Default: "set null"
+}
+```
+
+```typescript
+await orm.createCollection({
+  collectionName: "profile",
+  relations: [
+    {
+      collectionName: "user",
+      localKey: "userId",
+      foreignKey: "__id",
+      as: "user",
+      relationType: "belongsTo",
+      onUpdate: "cascade",
+      onDelete: "set null",
+    },
+  ],
+});
+
+// Here, profile belongs to user
+```
+
+#### Supported Relation Types
+
+| Type      | Description                                                   |
+| --------- | ------------------------------------------------------------- |
+| belongsTo | The current collection belongs to a parent collection         |
+| hasOne    | The current collection has one related child collection       |
+| hasMany   | The current collection has multiple related child collections |
+
+#### Relation Options
+
+| Option   | Behavior                                                                              |
+| -------- | ------------------------------------------------------------------------------------- |
+| cascade  | Automatically updates or deletes the related collection                               |
+| set null | Sets the related collection to null on delete or sets the local key to null on update |
+| restrict | Prevents deletion or update if there's relation                                       |
+| no acton | No automatic behavior                                                                 |
+
+###### Default:
+
+- onUpdate: "cascade"
+- onDelete: "set null"
+
+#### Using Relation in Queries
+
+Once defined, you can retrieve related data using **include** property.
+
+```typescript
+await usersCollection.find( {}, { include : "profile" );
+
+/*
+  [
+    {
+      __id: "1",
+      name: "Alice",
+      profile: {
+        __id: "1",
+        bio: "Software Engineer",
+        userId: "1",
+      },
+    },
+  ];
+*/
+```
+
+This will include the related user object under the key user (or whatever alias was defined in **as**)
+
+Note: the joined documents is embedded directly as object. hasMany joins will embed an array of objects instead.
+
+hasMany Join Example
+
+```typescript
+await studentsCollection.find(
+  {},
+  {
+    include: {
+      collectionName: "student",
+      limit: 10,
+    },
+  }
+);
+
+/*
+  [
+    {
+      __id: "1",
+      name: "Alice",
+      marks: [
+        {
+          __id: "1",
+          userId: "1",
+          info: 7,
+          maths: 8,
+          geo: 6,
+        },
+        {},...
+      ],
+    },
+  ];
+*/
+```
+
+### Using Query Operators
 
 Operators are special symbols or keywords that allow you to carry out mathematical or logical operations. snapjson provides a large number of operators to help you build complex queries.
 
@@ -432,7 +643,7 @@ snapjson offers the following query operator types:
 - Logical
 - Array
 
-## Comparison Operators
+#### Comparison Operators
 
 snapjson comparison operators can be used to compare values in a document. The following table contains the common comparison operators.
 
@@ -447,7 +658,7 @@ snapjson comparison operators can be used to compare values in a document. The f
 | $in       | Matches any of the values in an array.                          |
 | $nin      | Matches none of the values specified in an array.               |
 
-### $eq Operator
+##### $eq Operator
 
 In this example, we retrieve the document with the exact id value 2.
 
@@ -465,7 +676,7 @@ if (user) console.log(user.toObject());
 }
 ```
 
-### $ne Operator
+##### $ne Operator
 
 Suppose we have a collection of students, and we need to find all documents whose age field is not equal to 40:
 
@@ -499,7 +710,7 @@ await studentsCollection.find({ age: { $ne: 40 } }))
 */
 ```
 
-### $gt Operator
+##### $gt Operator
 
 In this example, we retrieve the documents where the age field is greater than 35:
 
@@ -533,7 +744,7 @@ await studentsCollection.find({ age: { $gt: 35 } });
 */
 ```
 
-### $lt Operator
+##### $lt Operator
 
 Let’s find the documents whose age field is less than 35:
 
@@ -567,7 +778,7 @@ await studentsCollection.find({ age: { $lt: 35 } });
 */
 ```
 
-### $gte Operator
+##### $gte Operator
 
 Suppose we have a collection of students, and we need to find all documents whose age field is greater than or equal to 35.
 
@@ -601,7 +812,7 @@ await studentsCollection.find({ age: { $gte: 35 } });
 */
 ```
 
-### $lte Operator
+##### $lte Operator
 
 Let’s find the documents whose age field is less than or equal to 35.
 
@@ -635,7 +846,7 @@ await studentsCollection.find({ age: { $lte: 35 } });
 */
 ```
 
-### $in Operator
+##### $in Operator
 
 The following query returns documents where the age field contains the given values.
 
@@ -669,7 +880,7 @@ await studentsCollection.find({ age: { $in: [20, 30, 40] } });
 */
 ```
 
-### $nin Operator
+##### $nin Operator
 
 In this example, we retrieve the documents where the age field doesn't contain the given values.
 
@@ -703,7 +914,7 @@ await studentsCollection.find({ age: { $nin: [20, 30, 40] } });
 */
 ```
 
-## Logical Operators
+#### Logical Operators
 
 Logical operators are used to filter data based on given conditions. They provide a way to combine multiple conditions.
 
@@ -714,7 +925,7 @@ snapjson provides two logical operators: $or and $and.
 | $and     | Joins two or more queries with a logical AND and returns the documents that match all the conditions. |
 | $or      | Join two or more queries with a logical OR and return the documents that match either query.          |
 
-### $and Operator
+##### $and Operator
 
 Find documents that match both the following conditions:
 
@@ -756,7 +967,7 @@ await studentsCollection.find({
 /*
 ```
 
-### $or Operator
+##### $or Operator
 
 Find documents that match either of the following conditions:
 
@@ -794,7 +1005,7 @@ await studentsCollection.find({
 */
 ```
 
-## Array Operators
+#### Array Operators
 
 snapjson provides several operators for searching arrays.
 Here are the array operators provided by snapjson.
@@ -806,7 +1017,7 @@ Here are the array operators provided by snapjson.
 | $contains   | Matches arrays that contain all the specified values.                                      |
 | $nocontains | Matches arrays that do not contain all the specified values.                               |
 
-### Basic query
+##### Basic query
 
 Suppose we have a collection of shoes, and we need to find all shoes that have 3 colors: the first color is red, second is white, and third is green.
 
@@ -835,11 +1046,11 @@ const arr3 = [1, [2], 3];
 const arr4 = [1, [2], 3];
 ```
 
-### $eq and $ne operators
+##### $eq and $ne operators
 
 We have already explained in detail their use cases. They are used in the same way for the arrays.
 
-### $contains operator
+##### $contains operator
 
 Suppose we have a collection of shoes, and we need to find all shoes that have at least 2 colors: white and black.
 
@@ -876,7 +1087,7 @@ await shoesCollection.find({ colors: { $contains: ["black", "white"] } });
 */
 ```
 
-### $nocontains operator
+##### $nocontains operator
 
 In this example, we retrieve the documents where the colors field doesn't contain white and black colors at once..
 
@@ -936,7 +1147,7 @@ await shoesCollection.find({ colors: { $nocontains: "white" } });
 */
 ```
 
-# Working with Regular Expressions
+### Working with Regular Expressions
 
 snapjson supports regular expressions for string-based queries. You can use regular expressions with various operators to search for patterns within string.
 

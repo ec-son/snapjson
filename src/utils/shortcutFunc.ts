@@ -2,7 +2,10 @@ import { Collection } from "../lib/collection";
 import { Document } from "../lib/document";
 import { SnapJson } from "../lib/snapjson";
 import { DocumentDataType } from "../types/document-data.type";
-import { DatabaseInfoOptionType } from "../types/orm.type";
+import {
+  CreatingCollectionOptinType,
+  DatabaseConfigType,
+} from "../types/orm.type";
 
 /**
  * Returns instance of collection
@@ -20,9 +23,7 @@ import { DatabaseInfoOptionType } from "../types/orm.type";
  */
 export async function defineCollection<T extends Object>(
   collectionName: string,
-  opt: Partial<
-    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
-  > & { force?: boolean }
+  opt: DatabaseConfigType & { force?: boolean }
 ): Promise<Collection<T>>;
 
 /**
@@ -52,6 +53,13 @@ export async function defineCollection<T extends Object>(
   return orm.collection(collectionName, force);
 }
 
+export async function createCollections<T extends Object>(
+  collections: string[] | CreatingCollectionOptinType<T>[],
+  opt?: DatabaseConfigType & { force?: boolean }
+): Promise<Collection<T>[]> {
+  return createCollection(collections, opt);
+}
+
 /**
  * Creates a new collection.
  * @param {string | { name: string; uniqueKeys?: Array<keyof T> }} collection The name of the collection or an object with the following properties:
@@ -68,26 +76,18 @@ export async function defineCollection<T extends Object>(
  * @returns Collection instance(s).
  */
 export async function createCollection<T extends Object>(
-  collection: string | { collectionName: string; uniqueKeys?: Array<keyof T> },
-  opt?: Partial<
-    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
-  > & { force?: boolean }
+  collection: string | CreatingCollectionOptinType<T>,
+  opt?: DatabaseConfigType & { force?: boolean }
 ): Promise<Collection<T>>;
 
 export async function createCollection<T extends Object>(
-  collections:
-    | string[]
-    | { collectionName: string; uniqueKeys?: Array<keyof T> }[],
-  opt?: Partial<
-    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
-  > & { force?: boolean }
+  collections: string[] | CreatingCollectionOptinType<T>[],
+  opt?: DatabaseConfigType & { force?: boolean }
 ): Promise<Collection<T>[]>;
 
 export async function createCollection<T extends Object>(
   collections: any,
-  opt?: Partial<
-    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
-  > & { force?: boolean }
+  opt?: DatabaseConfigType & { force?: boolean }
 ): Promise<Collection<T> | Collection<T>[]> {
   const orm = new SnapJson(opt);
   if (Array.isArray(collections))
@@ -110,9 +110,7 @@ export async function createCollection<T extends Object>(
  */
 export async function removeCollection(
   collections: string | string[],
-  opt?: Partial<
-    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
-  > & { force?: boolean }
+  opt?: DatabaseConfigType & { force?: boolean }
 ): Promise<typeof collections | undefined> {
   const orm = new SnapJson(opt);
   return orm.removeCollection(collections, opt?.force);
@@ -121,16 +119,14 @@ export async function removeCollection(
 /**
  * Creates instance of document.
  * @param documents one document or array of documents.
- * @param path_id path to the database file.
+ * @param path_db path to the database file.
  * @param collectionName name of the collection.
  * @returns Returns instance of document or an array of documents.
  */
 export function defineDocument<T extends Object>(
   documents: T | T[],
   collectionName: string,
-  opt: Partial<
-    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
-  >
+  opt: DatabaseConfigType
 ): DocumentDataType<T> | Array<DocumentDataType<T>> {
   if (!Array.isArray(documents))
     return new Document<T>(

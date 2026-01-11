@@ -1,6 +1,6 @@
 {
   "name": "snapjson",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "A simple ORM for Node.js using JSON file",
   "author": {
     "name": "Amissi Ec-son",
@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
+    "build": "tsc",
     "test": "jest --watch"
   },
   "keywords": [

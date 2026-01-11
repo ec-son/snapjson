@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "strict": true,
     "module": "commonjs",
     "declaration": true,
     "removeComments": true,
@@ -19,6 +20,7 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
     // "paths": { "src/*": ["src/*"] }
-  }
-  // "include": ["src/**/*"]
+  },
+  "include": ["src/**/*"]
+  // "exclude": ["dev", "test"]
 }
