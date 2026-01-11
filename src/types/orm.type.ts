@@ -192,6 +192,15 @@ type DatabaseInfoOptionType = {
   mode?: "dev" | "prod";
 };
 
+type DatabaseConfigType = {
+  path_db?: string;
+  splitFile?: boolean; // Each collection is stored in its own file
+  encrypted?: boolean; // Each collection is encrypted
+  secretKey?: string;
+  salt?: string;
+  mode?: "dev" | "prod";
+};
+
 /**
  * Defines a relationship between collections in the ORM
  */
@@ -280,6 +289,7 @@ export {
   CollectionType,
   DataBaseType,
   DatabaseInfoOptionType,
+  DatabaseConfigType,
   CreatingCollectionOptinType,
   RelationType,
   RelationQueryOptionType,

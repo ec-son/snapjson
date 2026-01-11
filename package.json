@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
+    "build": "tsc",
     "test": "jest --watch"
   },
   "keywords": [

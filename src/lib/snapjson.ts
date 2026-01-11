@@ -4,6 +4,7 @@ import {
   CollectionInfoType,
   CollectionType,
   CreatingCollectionOptinType,
+  DatabaseConfigType,
   DatabaseInfoOptionType,
   OrmInfoType,
   RelationType,
@@ -19,14 +20,7 @@ export class SnapJson {
     Exclude<keyof DatabaseInfoOptionType, "flag">
   >;
 
-  constructor(
-    opt?: Partial<
-      Pick<
-        DatabaseInfoOptionType,
-        Exclude<keyof DatabaseInfoOptionType, "flag">
-      >
-    >
-  ) {
+  constructor(opt?: DatabaseConfigType) {
     this._opt = getOpts(opt);
   }
 
@@ -87,60 +81,20 @@ export class SnapJson {
       if (typeof collection === "string")
         collection = { collectionName: collection };
 
+      // setting collection info
       newCollectionInfo.collectionName = collection.collectionName;
       newCollectionInfo.idStrategy = collection.idStrategy || "increment";
-      newCollectionInfo.unique = (collection.uniqueKeys as any[]) || [];
+      newCollectionInfo.unique = [] as any[];
       newCollectionInfo.createdAt = collection.createdAt || false;
       newCollectionInfo.updatedAt = collection.updatedAt || false;
 
-      // const getRelations = (
-      //   relations: string | string[] | RelationType | RelationType[]
-      // ): RelationType[] => {
-      //   if (!relations) return [];
-      //   if (!Array.isArray(relations)) relations = [relations as any];
-      //   const newRelations = [];
+      // removal of duplicates
+      for (const uniqueKey of collection.uniqueKeys || []) {
+        if (!newCollectionInfo.unique.includes(uniqueKey as any))
+          newCollectionInfo.unique.push(uniqueKey as any);
+      }
 
-      //   for (const element of relations) {
-      //     let relation: RelationType;
-      //     if (typeof element === "string")
-      //       relation = { collectionName: element } as RelationType;
-      //     else relation = element;
-
-      //     if (relation.collectionName === collection.collectionName) continue;
-      //     if (
-      //       !collectionInfo.find(
-      //         (el) => el.collectionName === relation.collectionName
-      //       ) &&
-      //       !(collections as CreatingCollectionOptinType<T>[]).find(
-      //         (el) => el.collectionName === relation.collectionName
-      //       )
-      //     )
-      //       throw new Error(
-      //         `Collection '${relation.collectionName}' doesn't exist.`
-      //       );
-
-      //     relation.relationType ||= "hasOne";
-      //     relation.localKey ||= `${
-      //       relation.relationType === "belongsTo"
-      //         ? relation.collectionName
-      //         : collection.collectionName
-      //     }Id`;
-
-      //     const newRelation: RelationType = {
-      //       collectionName: relation.collectionName,
-      //       localKey: relation.localKey,
-      //       foreignKey: relation.foreignKey || "__id",
-      //       as: relation.as || relation.collectionName,
-      //       onDelete: relation.onDelete || "SET NULL",
-      //       onUpdate: relation.onUpdate || "CASCADE",
-      //       relationType: relation.relationType,
-      //     };
-
-      //     newRelations.push(newRelation);
-      //   }
-      //   return newRelations;
-      // };
-
+      //setting Relations
       newCollectionInfo.relations = this.getRelations(
         collection.collectionName,
         [

@@ -3,6 +3,7 @@ import { DocumentDataType } from "../types/document-data.type";
 import {
   CollectionInfoType,
   CollectionType,
+  DatabaseConfigType,
   DatabaseInfoOptionType,
   OrmInfoType,
   QueryOneOptionType,
@@ -33,14 +34,7 @@ export class Collection<
 
   constructor(
     private readonly _collectionName: string,
-    opt?:
-      | Partial<
-          Pick<
-            DatabaseInfoOptionType,
-            Exclude<keyof DatabaseInfoOptionType, "flag">
-          >
-        >
-      | undefined
+    opt?: DatabaseConfigType | undefined
   ) {
     if ("__metadata__" === _collectionName)
       throw new Error("Connot create collection with '__metadata__' name.");

@@ -88,43 +88,47 @@ import { SnapJson, createCollection } from "snapjson";
 ```
 
 ### Creating an instance of `SnapJson`
+
 To use SnapJson, you need to create an instance of the class. You can configure it by passing an options object or by using environment variables.
 
 #### 🔹 Option 1: Using a configuration object
 
 ```typescript
 const config = {
-  path_id: "db"
-}
+  path_db: "db",
+};
 const orm = new SnapJson(config);
 ```
+
 Available Options
 
-|Option|Type|Default|Description|
-|---------|-----------|-------------|--------------------------------------- |
-|path_id|string (optional)|"db"|Directory where JSON data will be stored|
-|splitFile|boolean (optional)|false|If **true**, each collection is stored in its own file|
-|encrypted|boolean (optional)|false|It **true**, data will be encrypted|
-|secretKey|string (optional)|undefined|Key used for encryption|
-|salt|string (optional)|undefined|Optional salt for additional encryption security|
-|mode|"dev" \\| "prod"|"dev"|Defines the working mode (development or production)|
+| Option    | Type               | Default   | Description                                            |
+| --------- | ------------------ | --------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| path_db   | string (optional)  | "db"      | Directory where JSON data will be stored               |
+| splitFile | boolean (optional) | false     | If **true**, each collection is stored in its own file |
+| encrypted | boolean (optional) | false     | It **true**, data will be encrypted                    |
+| secretKey | string (optional)  | undefined | Key used for encryption                                |
+| salt      | string (optional)  | undefined | Optional salt for additional encryption security       |
+| mode      | "dev" \\           | "prod"    | "dev"                                                  | Defines the working mode (development or production) |
 
 #### 🔹 Option 1: Using environment variables
-SnapJson also supports environment variables for configuration. If environment variables are set, you can instantiate SnapJson without passing any config object. 
+
+SnapJson also supports environment variables for configuration. If environment variables are set, you can instantiate SnapJson without passing any config object.
 
 ```typescript
 const orm = new SnapJson();
 ```
+
 Available Options
 
-|Variable Name|Default|Description|
-|---------|-------------|-------- |
-|SNAPJSON_PATH_DB|"db"|Directory where JSON data will be stored|
-|SNAPJSON_SPLITFILE|"false"|If **true**, each collection is stored in its own file|
-|SNAPJSON_ENCRYPTED|"false"|It **true**, data will be encrypted|
-|SNAPJSON_SECRETKEY|" "|Key used for encryption|
-|SNAPJSON_SALT|" "|Optional salt for additional encryption security|
-|NODE_ENV|"environment"|Defines the working mode (development or production). values: `environment` \\| `production`|
+| Variable Name      | Default       | Description                                                                    |
+| ------------------ | ------------- | ------------------------------------------------------------------------------ | ------------ |
+| SNAPJSON_PATH_DB   | "db"          | Directory where JSON data will be stored                                       |
+| SNAPJSON_SPLITFILE | "false"       | If **true**, each collection is stored in its own file                         |
+| SNAPJSON_ENCRYPTED | "false"       | It **true**, data will be encrypted                                            |
+| SNAPJSON_SECRETKEY | " "           | Key used for encryption                                                        |
+| SNAPJSON_SALT      | " "           | Optional salt for additional encryption security                               |
+| NODE_ENV           | "environment" | Defines the working mode (development or production). values: `environment` \\ | `production` |
 
 ### Defining the data schema
 
@@ -175,9 +179,9 @@ Alternatively, you can use a shortcut helper function:
 const collection = await createCollection("user");
 
 const config = {
-  path_id: "id",
+  path_db: "id",
   splitFile: true,
-  mode: "dev"
+  mode: "dev",
 };
 const collections = await createCollection(["user", "teacher"], config);
 ```
@@ -191,10 +195,10 @@ To define a collection, you have three methods available:
 ```typescript
 import { SnapJson } from "snapjson";
 const config = {
-  path_id: "id",
+  path_db: "id",
   splitFile: true,
-  mode: "dev"
-}; 
+  mode: "dev",
+};
 const orm = new SnapJson(config);
 const usersCollection = await orm.collection<UserSchema>("user");
 
@@ -208,11 +212,11 @@ This will return an instance of this collection if it exists, otherwise, an erro
 ```typescript
 import { defineCollection } from "snapjson";
 const config = {
-  path_id: "id",
+  path_db: "id",
   splitFile: true,
   mode: "dev",
-  force: true // If true, create collection 'user' when it doesn't exist.
-}; 
+  force: true, // If true, create collection 'user' when it doesn't exist.
+};
 const usersCollection = await defineCollection<UserSchema>("user", config);
 
 const usersCollection = await defineCollection<UserSchema>("user", config);
@@ -223,10 +227,10 @@ const usersCollection = await defineCollection<UserSchema>("user", config);
 ```typescript
 import { Collection } from "snapjson";
 const config = {
-  path_id: "id",
+  path_db: "id",
   splitFile: true,
   mode: "dev",
-  force: true // If true, create collection 'user' when it doesn't exist.
+  force: true, // If true, create collection 'user' when it doesn't exist.
 };
 const usersCollection = new Collection<UserSchema>("user", config);
 ```
@@ -403,15 +407,25 @@ if (user) console.log(user.toObject());
 
 ### Document methods
 
+The Document object provides several methods for manipulating the properties of the document:
+
+| Name     | Description                                                                          |
+| -------- | ------------------------------------------------------------------------------------ |
+| delete   | Deletes the document from the collection.                                            |
+| save     | Saves the changes to the document.                                                   |
+| toJSON   | Converts the document into JSON.                                                     |
+| toObject | Converts the document into a plain object.                                           |
+| update   | Updates the document. If the `save` flag is set to true, the document will be saved. |
+
 ```typescript
 const user = await usersCollection.findById(1);
 
 if (user) {
-  console.log(user.toObject()); // Convert document into a plain object.
-  console.log(user.toJSON()); // Convert document into JSON.
+  console.log(user.toObject());
+  console.log(user.toJSON());
   user.age = 10;
-  await user.save(); // Save the changes to the document
-  await user.delete(); // Delete the document from the collection
+  await user.save();
+  await user.delete();
 }
 ```
 

@@ -2,7 +2,6 @@ import { defineCollection } from "../utils/shortcutFunc";
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
 import { DatabaseInfoOptionType } from "../types/orm.type";
-import { getOpts } from "../utils/opts.func";
 
 export class Document<T extends Object> {
   private id: number = -1;
@@ -10,7 +9,7 @@ export class Document<T extends Object> {
   [key: string]: any;
   private privateProps = [
     "collectionName",
-    "path_id",
+    "path_db",
     "document",
     "id",
     "collection",
@@ -79,8 +78,8 @@ export class Document<T extends Object> {
   }
 
   /**
-   * Updates this document.
-   * @returns Returns true if the document is successfully updated, false otherwise.
+   * Saves this document.
+   * @returns Returns true if the document is successfully saved, false otherwise.
    */
   async save() {
     await this.init();
@@ -101,6 +100,41 @@ export class Document<T extends Object> {
       (await this.collection?.updateOne(data, { __id: this.id } as any)) !==
       null
     );
+  }
+
+  /**
+   * Updates this document.
+   *
+   * Updates the properties of the document and updates the document in the database if the `save` flag is set to true.
+   *
+   * @param obj - The properties to update.
+   * @param save - If true the document will be saved in the database.
+   * @returns - Returns true if the document is successfully updated, false otherwise.
+   */
+  async update(obj: Partial<T>, save?: boolean): Promise<boolean> {
+    const { __id, ...rest } = obj as any;
+    obj = rest;
+    if (!obj && Object.keys(obj).length < 1) return true;
+
+    // updating properties
+    for (const key of Object.keys(obj)) {
+      if (
+        Object.keys(this.document).includes(key) &&
+        !isEqual(this.document[key], obj[key])
+      ) {
+        // updating the document properties
+        this.document[key] = obj[key];
+        // updating the document object properties
+        this[key] = obj[key] as any;
+      }
+    }
+
+    if (save) {
+      // saving the updated document to the database
+      return await this.save();
+    }
+
+    return true;
   }
 
   /**

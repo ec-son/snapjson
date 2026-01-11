@@ -45,7 +45,7 @@ describe("Snapjson", () => {
     Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
   >;
 
-  let snapjson;
+  let snapjson: any;
   beforeEach(() => {
     snapjson = new SnapJson(mockOpts);
     (loadData as jest.Mock).mockClear();
