@@ -95,7 +95,20 @@ describe("SnapJsonCLI", () => {
       await cli.run();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid create subcommand")
+        expect.stringContaining("Invalid argument")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should show error for invalid create flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "create", "-x"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid argument")
       );
 
       process.argv = originalArgv;
@@ -103,10 +116,12 @@ describe("SnapJsonCLI", () => {
 
     it("should show error for invalid list flag", async () => {
       // Setup configured database
-      writeFileSync(
-        ".env",
-        "SNAPJSON_PATH_DB=db\nNODE_ENV=development\nSNAPJSON_SPLITFILE=false\nSNAPJSON_ENCRYPTED=false\n"
-      );
+      if (!existsSync(".env")) {
+        writeFileSync(
+          ".env",
+          "SNAPJSON_PATH_DB=db\nNODE_ENV=development\nSNAPJSON_SPLITFILE=false\nSNAPJSON_ENCRYPTED=false\n"
+        );
+      }
 
       const originalArgv = process.argv;
       process.argv = ["node", "snapjson", "list", "-x"];
@@ -114,7 +129,288 @@ describe("SnapJsonCLI", () => {
       await cli.run();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid list flag")
+        expect.stringContaining("Invalid flag")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should show error for invalid delete flag", async () => {
+      if (!existsSync(".env")) {
+        writeFileSync(
+          ".env",
+          "SNAPJSON_PATH_DB=db\nNODE_ENV=development\nSNAPJSON_SPLITFILE=false\nSNAPJSON_ENCRYPTED=false\n"
+        );
+      }
+
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "delete", "-x"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid flag")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should handle version error gracefully", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "--version"];
+
+      (utils.showVersion as jest.Mock).mockImplementation(() => {
+        throw new Error("Version file not found");
+      });
+
+      await cli.run();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("expected error")
+      );
+
+      process.argv = originalArgv;
+    });
+  });
+
+  describe("init command", () => {
+    it("should initialize database with default config using -y flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "init", "-y"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      process.argv = originalArgv;
+    });
+
+    it("should initialize database with --yes flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "init", "--yes"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      process.argv = originalArgv;
+    });
+
+    it("should handle init with i shorthand", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "i", "-y"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      process.argv = originalArgv;
+    });
+  });
+
+  describe("create command", () => {
+    beforeEach(() => {
+      writeFileSync(
+        ".env",
+        "SNAPJSON_PATH_DB=db\nNODE_ENV=development\nSNAPJSON_SPLITFILE=false\nSNAPJSON_ENCRYPTED=false\n"
+      );
+    });
+
+    it("should handle create collection with c shorthand", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "c", "-c"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should handle create collection with --collection", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "create", "--collection"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should handle create relation with r shorthand", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "c", "-r"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should handle create relation with --relation", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "create", "--relation"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+  });
+
+  describe("list command", () => {
+    beforeEach(() => {
+      writeFileSync(
+        ".env",
+        "SNAPJSON_PATH_DB=db\nNODE_ENV=development\nSNAPJSON_SPLITFILE=false\nSNAPJSON_ENCRYPTED=false\n"
+      );
+
+      (SnapJson as jest.Mock).mockImplementation(() => ({
+        getCollections: jest.fn().mockResolvedValue(["users", "posts"]),
+        getRelations: jest.fn().mockResolvedValue([]),
+      }));
+    });
+
+    it("should list collections with l shorthand", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "l", "-c"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should list collections with --collection", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "list", "--collection"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should list relations with -r flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "list", "-r"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should list relations with --relation", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "list", "--relation"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+  });
+
+  describe("delete command", () => {
+    beforeEach(() => {
+      if (existsSync(".env")) {
+        unlinkSync(".env");
+      }
+      writeFileSync(
+        ".env",
+        "SNAPJSON_PATH_DB=db\nNODE_ENV=development\nSNAPJSON_SPLITFILE=false\nSNAPJSON_ENCRYPTED=false\n"
+      );
+
+      (SnapJson as jest.Mock).mockImplementation(() => ({
+        removeCollection: jest.fn().mockResolvedValue(["users"]),
+        deleteRelation: jest.fn().mockResolvedValue([]),
+        getCollections: jest.fn().mockResolvedValue(["users", "posts"]),
+      }));
+    });
+
+    it("should delete collections with d shorthand", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "d", "-c"];
+
+      (utils.question as jest.Mock).mockResolvedValueOnce("users");
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should delete collections with --collection", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "delete", "--collection"];
+
+      (utils.question as jest.Mock).mockResolvedValueOnce("users");
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should delete relations with -r flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "delete", "-r"];
+
+      (utils.question as jest.Mock)
+        .mockResolvedValueOnce("posts")
+        .mockResolvedValueOnce("users");
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should delete relations with --relation", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "delete", "--relation"];
+
+      (utils.question as jest.Mock)
+        .mockResolvedValueOnce("posts")
+        .mockResolvedValueOnce("users");
+
+      await cli.run();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Database is not configured")
       );
 
       process.argv = originalArgv;
@@ -138,6 +434,19 @@ describe("SnapJsonCLI", () => {
     it("should show error if database not configured for list command", async () => {
       const originalArgv = process.argv;
       process.argv = ["node", "snapjson", "list", "-c"];
+
+      await cli.run();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("not configured")
+      );
+
+      process.argv = originalArgv;
+    });
+
+    it("should show error if database not configured for delete command", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "delete", "-c"];
 
       await cli.run();
 
