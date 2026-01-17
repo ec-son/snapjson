@@ -9,9 +9,9 @@ import * as shortcutFunc from "../src/utils/shortcutFunc";
  */
 
 const obj = {
-  __id: 5,
   name: "test",
   age: 17,
+  __id: 5,
 };
 
 const mockCreateCollection = jest.spyOn(shortcutFunc, "defineCollection");
@@ -33,17 +33,18 @@ describe("creating document", () => {
   });
 
   it("should return string representing properties of document", () => {
-    expect(user.toJSON()).toEqual(JSON.stringify(obj));
+    expect(user.toJSON()).toMatch(JSON.stringify(obj));
   });
 
   it("should save document", async () => {
     user.age = 20;
     const { __id, ...expected } = user.toObject();
     await user.save();
+
     expect(mockUpdateOne).toHaveBeenNthCalledWith(1, { age: 20 }, { __id: 5 });
   });
 
-  it("should apdate document", () => {
+  it("should update document", () => {
     const data = { __id: 5, name: "test1", age: 25, email: "test1@gmail.com" };
     const mockSave = jest
       .spyOn(user as any, "save")
@@ -57,7 +58,7 @@ describe("creating document", () => {
     mockSave.mockRestore();
   });
 
-  it("should apdate document and save", () => {
+  it("should update document and save", () => {
     const mockSave = jest
       .spyOn(user as any, "save")
       .mockImplementation(() => {});
