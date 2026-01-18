@@ -1,21 +1,12 @@
 import { defineCollection } from "../utils/shortcutFunc";
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
-import { DatabaseInfoOptionType } from "../types/orm.type";
+import { DatabaseConfigType, DatabaseInfoOptionType } from "../types/orm.type";
 
 export class Document<T extends Object> {
   private id: number = -1;
   private collection: Collection<T> | null = null;
   [key: string]: any;
-  private privateProps = [
-    "collectionName",
-    "path_db",
-    "document",
-    "id",
-    "collection",
-    "__id",
-    "privateProps",
-  ];
   private _opt: DatabaseInfoOptionType = {
     path_db: "db",
     mode: "dev",
@@ -26,21 +17,16 @@ export class Document<T extends Object> {
   constructor(
     private document: T,
     private collectionName: string,
-    opt: Partial<
-      Pick<
-        DatabaseInfoOptionType,
-        Exclude<keyof DatabaseInfoOptionType, "flag">
-      >
-    >
+    opt: DatabaseConfigType
   ) {
-    Object.keys(this.document).forEach((key: string) => {
-      this[key] = this.document[key as keyof T];
-    });
+    for (const key of Object.keys(document)) {
+      this[key] = document[key as keyof T];
+    }
 
     if ((document as { __id?: number }).__id) {
-      this.id = (document as { __id?: number }).__id!;
       const { __id, ...rest } = document as any;
-      document = rest;
+      this.id = __id;
+      this.document = rest;
     }
 
     this._opt = { ...(opt as any), flag: collectionName };
@@ -51,13 +37,10 @@ export class Document<T extends Object> {
    * @returns Converted document.
    */
   toObject(): T {
-    const document = structuredClone(this.document);
+    const document: typeof this.document = {} as any;
 
-    for (const key of Object.keys(this)) {
-      if (this.hasOwnProperty(key) && !this.privateProps.includes(key)) {
-        if (key === "_opt") continue;
-        document[key as keyof T] = this[key];
-      }
+    for (const key of Object.keys(this.document)) {
+      document[key as keyof T] = this[key];
     }
 
     if (this.id !== -1) (document as { __id?: number })["__id"] = this.id;
@@ -86,20 +69,23 @@ export class Document<T extends Object> {
     let document = this.toObject();
 
     let data: T = {} as T;
-    (Object.keys(this.document) as Array<keyof T>).forEach((key) => {
+
+    for (const key of Object.keys(this.document)) {
       if (!isEqual(this.document[key], document[key]))
         data[key] = document[key];
-    });
-
-    if ((data as { __id?: number }).__id) {
-      const { __id, ...rest } = data as any;
-      data = rest;
     }
+    if (!data || Object.keys(data).length < 1) return false;
 
-    return (
+    const saved =
       (await this.collection?.updateOne(data, { __id: this.id } as any)) !==
-      null
-    );
+      null;
+
+    if (saved) {
+      for (const key of Object.keys(data)) {
+        this.document[key] = data[key];
+      }
+    }
+    return saved;
   }
 
   /**
@@ -112,21 +98,15 @@ export class Document<T extends Object> {
    * @returns - Returns true if the document is successfully updated, false otherwise.
    */
   async update(obj: Partial<T>, save?: boolean): Promise<boolean> {
-    const { __id, ...rest } = obj as any;
-    obj = rest;
-    if (!obj && Object.keys(obj).length < 1) return true;
+    if (!obj && Object.keys(obj).length < 1) return false;
 
-    // updating properties
     for (const key of Object.keys(obj)) {
       if (
-        Object.keys(this.document).includes(key) &&
-        !isEqual(this.document[key], obj[key])
-      ) {
-        // updating the document properties
-        this.document[key] = obj[key];
-        // updating the document object properties
+        !isEqual(this[key], obj[key]) &&
+        Object.keys(this.document).includes(key)
+      )
+        // updating properties
         this[key] = obj[key] as any;
-      }
     }
 
     if (save) {

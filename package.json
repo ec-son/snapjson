@@ -8,13 +8,15 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": "./dist/bin/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
   "scripts": {
     "dev": "tsnd  --respawn dev/test.ts",
-    "build": "tsc",
-    "test": "jest --watch"
+    "build": "tsc --build",
+    "test": "jest --watch",
+    "cli": "tsc && node ./dist/bin/index.js"
   },
   "keywords": [
     "ec",
