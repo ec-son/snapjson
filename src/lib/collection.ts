@@ -37,7 +37,9 @@ export class Collection<
     opt?: DatabaseConfigType | undefined
   ) {
     if ("__metadata__" === _collectionName)
-      throw new Error("Connot create collection with '__metadata__' name.");
+      throw new Error(
+        "Cannot create collection with '__metadata__' name. This name is reserved for internal use."
+      );
 
     this._opt = { ...getOpts(opt), flag: _collectionName };
 

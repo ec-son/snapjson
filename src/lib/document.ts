@@ -2,17 +2,13 @@ import { defineCollection } from "../utils/shortcutFunc";
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
 import { DatabaseConfigType, DatabaseInfoOptionType } from "../types/orm.type";
+import { getOpts } from "src/utils/opts.func";
 
 export class Document<T extends Object> {
   private id: number = -1;
   private collection: Collection<T> | null = null;
   [key: string]: any;
-  private _opt: DatabaseInfoOptionType = {
-    path_db: "db",
-    mode: "dev",
-    splitFile: false,
-    flag: "",
-  };
+  private _opt: DatabaseInfoOptionType;
 
   constructor(
     private document: T,
@@ -29,7 +25,7 @@ export class Document<T extends Object> {
       this.document = rest;
     }
 
-    this._opt = { ...(opt as any), flag: collectionName };
+    this._opt = { ...getOpts(opt), flag: collectionName };
   }
 
   /**
@@ -98,7 +94,7 @@ export class Document<T extends Object> {
    * @returns - Returns true if the document is successfully updated, false otherwise.
    */
   async update(obj: Partial<T>, save?: boolean): Promise<boolean> {
-    if (!obj && Object.keys(obj).length < 1) return false;
+    if (!obj || Object.keys(obj).length < 1) return false;
 
     for (const key of Object.keys(obj)) {
       if (

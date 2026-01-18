@@ -28,6 +28,11 @@
   - [Additional methods](#additional-methods)
     - [SnapJson class](#snapjson-class)
     - [Collection class](#collection-class)
+- [Command Line Interface (CLI)](#command-line-interface-cli)
+  - [Database Configuration](#database-configuration)
+  - [Collection Management](#collection-management)
+  - [Relation Management](#relation-management)
+  - [Complete Workflow Example](#complete-workflow-example)
 - [Advanced Usage](#advanced-usage)
   - [Defining Relations Between Collection](#defining-relations-between-collection)
     - [Overview](#overview)
@@ -81,6 +86,8 @@ pnpm add snapjson
 
 To use the snapjson module, follow these simple steps:
 
+- For a quick start, we provide CLI commands to configure the database and create collections rapidly. To access the CLI commands, click [here](#command-line-interface-cli).
+
 ### Importing the `SnapJson` class
 
 ```typescript
@@ -102,14 +109,14 @@ const orm = new SnapJson(config);
 
 Available Options
 
-| Option    | Type               | Default   | Description                                            |
-| --------- | ------------------ | --------- | ------------------------------------------------------ | ---------------------------------------------------- |
-| path_db   | string (optional)  | "db"      | Directory where JSON data will be stored               |
-| splitFile | boolean (optional) | false     | If **true**, each collection is stored in its own file |
-| encrypted | boolean (optional) | false     | It **true**, data will be encrypted                    |
-| secretKey | string (optional)  | undefined | Key used for encryption                                |
-| salt      | string (optional)  | undefined | Optional salt for additional encryption security       |
-| mode      | "dev" \\           | "prod"    | "dev"                                                  | Defines the working mode (development or production) |
+| Option    | Type                                | Default   | Description                                            |
+| --------- | ----------------------------------- | --------- | ------------------------------------------------------ |
+| path_db   | string (optional)                   | "db"      | Directory where JSON data will be stored               |
+| splitFile | boolean (optional)                  | false     | If **true**, each collection is stored in its own file |
+| encrypted | boolean (optional)                  | false     | It **true**, data will be encrypted                    |
+| secretKey | string (optional)                   | undefined | Key used for encryption                                |
+| salt      | string (optional)                   | undefined | Optional salt for additional encryption security       |
+| mode      | string (optional) ("prod" et "dev") | "dev"     | Defines the working mode (development or production)   |
 
 #### 🔹 Option 1: Using environment variables
 
@@ -121,14 +128,14 @@ const orm = new SnapJson();
 
 Available Options
 
-| Variable Name      | Default       | Description                                                                    |
-| ------------------ | ------------- | ------------------------------------------------------------------------------ | ------------ |
-| SNAPJSON_PATH_DB   | "db"          | Directory where JSON data will be stored                                       |
-| SNAPJSON_SPLITFILE | "false"       | If **true**, each collection is stored in its own file                         |
-| SNAPJSON_ENCRYPTED | "false"       | It **true**, data will be encrypted                                            |
-| SNAPJSON_SECRETKEY | " "           | Key used for encryption                                                        |
-| SNAPJSON_SALT      | " "           | Optional salt for additional encryption security                               |
-| NODE_ENV           | "environment" | Defines the working mode (development or production). values: `environment` \\ | `production` |
+| Variable Name      | Default       | Description                                                                                 |
+| ------------------ | ------------- | ------------------------------------------------------------------------------------------- |
+| SNAPJSON_PATH_DB   | "db"          | Directory where JSON data will be stored                                                    |
+| SNAPJSON_SPLITFILE | "false"       | If **true**, each collection is stored in its own file                                      |
+| SNAPJSON_ENCRYPTED | "false"       | It **true**, data will be encrypted                                                         |
+| SNAPJSON_SECRETKEY | " "           | Key used for encryption                                                                     |
+| SNAPJSON_SALT      | " "           | Optional salt for additional encryption security                                            |
+| NODE_ENV           | "environment" | Defines the working mode (development or production). values: `environment` et `production` |
 
 ### Defining the data schema
 
@@ -503,6 +510,312 @@ const id = await usersCollection.lastInsertId();
 console.log(id); // 3
 
 // add and create methods are aliases for insertOne method
+```
+
+## Command Line Interface (CLI)
+
+SnapJson includes a powerful CLI tool built-in for managing your database configuration, creating and deleting collections, and defining relationships between collections. The CLI is automatically available when you install SnapJson.
+
+### Using the CLI
+
+After installing SnapJson, you can use the CLI with:
+
+```bash
+npx snapjson [command] [flags]
+```
+
+Or if you've installed SnapJson globally:
+
+```bash
+npm install -g snapjson
+snapjson [command] [flags]
+```
+
+### Database Configuration
+
+Before using any CLI commands, you need to configure your database.
+
+#### Initialize Database Configuration
+
+```bash
+snapjson init
+```
+
+This interactive command will prompt you for:
+
+- **Database path**: Where your JSON data files will be stored (default: `db`)
+- **Mode**: Development or production mode
+- **Encryption**: Enable/disable data encryption
+- **File splitting**: Whether to split data into multiple files
+- **Secret key and salt** (if encryption is enabled): For securing your data
+
+To use default values without prompts:
+
+```bash
+snapjson init --yes
+```
+
+**Example:**
+
+```bash
+$ snapjson init
+? Enter database path (db): mydata
+? Select mode (dev/prod): prod
+? Enable encryption? (yes/NO): yes
+? Enable file splitting? (yes/NO): no
+✓ Database configuration saved to .env file
+```
+
+### Collection Management
+
+#### Create Collections
+
+```bash
+snapjson create -c
+```
+
+or
+
+```bash
+snapjson c -c
+```
+
+This interactive command prompts for:
+
+- **Collection name**: Name of your collection (e.g., `users`, `posts`)
+- **Unique keys**: Fields that must be unique (comma-separated)
+- **ID strategy**: `increment` or `uuid`
+- **createdAt field**: Auto-add creation timestamp
+- **updatedAt field**: Auto-add update timestamp
+
+**Example:**
+
+```bash
+$ snapjson create -c
+=== Create Collection ===
+? Enter collection name: users
+? Does this collection have unique keys? (yes/NO): yes
+? Enter unique keys (comma-separated, e.g., "email,username"): email,username
+? ID Strategy - increment or uuid (default: increment): uuid
+? Add createdAt field? (yes/NO): yes
+? Add updatedAt field? (yes/NO): yes
+✓ Collection "users" created successfully!
+? Create another collection? (yes/NO): no
+✓ All collections created successfully!
+Use 'snapjson list --collection' to view all collections
+```
+
+#### List Collections
+
+```bash
+snapjson list -c
+```
+
+or
+
+```bash
+snapjson l -c
+```
+
+**Example output:**
+
+```bash
+$ snapjson list -c
+
+=== Collections ===
+
+1. users
+2. posts
+3. comments
+```
+
+#### Delete Collections
+
+```bash
+snapjson delete -c
+```
+
+or
+
+```bash
+snapjson d -c
+```
+
+You'll be prompted to enter the collection names (space-separated):
+
+**Example:**
+
+```bash
+$ snapjson delete -c
+? Enter collections to remove ("profile user post ..."): users posts
+Collections removed successfully : users, posts
+```
+
+### Relation Management
+
+#### Create Relations
+
+```bash
+snapjson create -r
+```
+
+or
+
+```bash
+snapjson c -r
+```
+
+This interactive command prompts for:
+
+- **Target collection**: The collection being referenced
+- **Source collection**: The collection containing the reference
+- **Relation type**: `hasOne`, `hasMany`, or `belongsTo`
+- **Local key**: Field in the local collection
+- **Foreign key**: Field in the related collection
+- **Relation field/alias**: Name of the relation property
+- **Referential actions**: `CASCADE`, `SET NULL`, `RESTRICT`, or `NO ACTION` for delete/update operations
+
+**Example:**
+
+```bash
+$ snapjson create -r
+
+Available collections: users, posts, comments
+
+=== Create Relation ===
+
+? Enter target collection name: users
+? Enter source collection name: posts
+? Relation type (hasOne/hasMany/belongsTo) (default: hasOne): hasOne
+? Local key (default: usersId): author_id
+? Foreign key: (default: __id): id
+? Enter relation field (default: posts): posts
+? Enter the referential action when deleting (CASCADE/SET NULL/RESTRICT/NO ACTION) (default: SET NULL): CASCADE
+? Enter the referential action when updating (CASCADE/SET NULL/RESTRICT/NO ACTION) (default: CASCADE): CASCADE
+✓ Relation created: users -> posts (hasOne)
+? Create another relation? (yes/NO): no
+✓ All relations created successfully!
+Use 'snapjson list --relation' to view all relations
+```
+
+#### List Relations
+
+```bash
+snapjson list -r
+```
+
+or
+
+```bash
+snapjson l -r
+```
+
+**Example output:**
+
+```bash
+$ snapjson list -r
+
+=== Relations ===
+
+1. posts belongsTo users
+2. comments belongsTo posts
+3. users hasMany posts
+```
+
+#### Delete Relations
+
+```bash
+snapjson delete -r
+```
+
+or
+
+```bash
+snapjson d -r
+```
+
+You'll be prompted for:
+
+- **Target collection**: The collection referenced in the relation
+- **Source collections**: The collections containing the references (space-separated)
+
+**Example:**
+
+```bash
+$ snapjson delete -r
+? Enter target collection name: users
+? Enter the names of the source collections ("profile post ..."): posts comments
+Relations removed successfully : posts, comments
+```
+
+### Help and Version
+
+Display available commands:
+
+```bash
+snapjson --help
+```
+
+or
+
+```bash
+snapjson -h
+```
+
+Display the installed version:
+
+```bash
+snapjson --version
+```
+
+or
+
+```bash
+snapjson -v
+```
+
+### Complete Workflow Example
+
+Here's a step-by-step example of setting up a blog database:
+
+```bash
+# 1. Initialize database
+snapjson init --yes
+
+# 2. Create collections
+snapjson create -c
+# Create: users, posts, comments
+
+# 3. List created collections
+snapjson list -c
+
+# 4. Define relationships
+snapjson create -r
+# Create: posts belongsTo users, comments belongsTo posts, users hasMany posts
+
+# 5. View all relationships
+snapjson list -r
+
+# 6. Use in your code
+```
+
+Then use it in your TypeScript/JavaScript code:
+
+```typescript
+import { SnapJson } from "snapjson";
+
+const orm = new SnapJson();
+
+// Collections are now configured and ready to use
+const users = await orm.collection("users");
+const posts = await orm.collection("posts");
+const comments = await orm.collection("comments");
+
+// Create a new user
+await users.add({ name: "John", email: "john@example.com" });
+
+// Create a post with relation to user
+await posts.add({ title: "My Blog", author_id: 1 });
 ```
 
 ## Advanced Usage

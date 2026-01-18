@@ -108,10 +108,12 @@ export class SnapJson {
 
       if (collectionsTab.includes(newCollectionInfo.collectionName)) break;
       if (!newCollectionInfo.collectionName)
-        throw new Error(`Connot create collection of undefined.`);
+        throw new Error(`Cannot create collection with undefined name.`);
 
       if ("__metadata__" === newCollectionInfo.collectionName)
-        throw new Error(`Connot create collection with '${name}' name.`);
+        throw new Error(
+          `Cannot create collection with '__metadata__' name. This name is reserved for internal use.`
+        );
 
       if (
         existedCollection.includes(newCollectionInfo.collectionName) &&

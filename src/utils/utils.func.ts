@@ -8,6 +8,15 @@ import {
 import { decrypt, encrypt } from "./cryptoUtil";
 import { loadData } from "./load-data";
 
+/**
+ * Encodes the given data according to the options.
+ * If the data is to be encrypted, it will be encrypted using the secret key and salt.
+ * Otherwise, it will be converted to a JSON string.
+ * If the mode is "dev", the JSON string will be formatted with indentation of 2 spaces.
+ * @param {any} data - The data to be encoded.
+ * @param {DatabaseInfoOptionType} opt - The options for encoding the data.
+ * @returns {Promise<string>} The encoded data as a string.
+ */
 export async function encodeData(
   data: any,
   opt: DatabaseInfoOptionType
@@ -20,6 +29,15 @@ export async function encodeData(
       : JSON.stringify(data);
 }
 
+/**
+ * Decodes the given data according to the options.
+ * If the data is encrypted, it will be decrypted using the secret key and salt.
+ * If the mode is "dev", the JSON string will be formatted with indentation of 2 spaces.
+ * If the data contains Date objects, they will be converted to ISO strings.
+ * @param {any} data - The data to be decoded.
+ * @param {DatabaseInfoOptionType} opt - The options for decoding the data.
+ * @returns {Promise<any>} The decoded data as a JSON object.
+ */
 export async function decodeData(
   data: any,
   opt: DatabaseInfoOptionType
@@ -48,6 +66,16 @@ export async function decodeData(
   }
 }
 
+/**
+ * Returns the path of the database file.
+ * If splitFile is true, the path will be determined according to the flag option.
+ * If flag is "orm-info" or "collection-info", the path will be "<path_db>/__metadata__.json".
+ * Otherwise, the path will be "<path_db>/<flag>.json".
+ * If splitFile is false, the path will be "<path_db>/db.json".
+ * If encrypted is true, the path will have ".crypt" appended to the end.
+ * @param {DatabaseInfoOptionType} opt - The options for getting the path of the database file.
+ * @returns {string} The path of the database file.
+ */
 export function getPath(opt: DatabaseInfoOptionType): string {
   let path_db = "";
   if (opt.splitFile) {
@@ -60,6 +88,12 @@ export function getPath(opt: DatabaseInfoOptionType): string {
   return path_db;
 }
 
+/**
+ * Removes the file at the specified path.
+ * @param {string} path - Path to the file to be removed.
+ * @returns {Promise<void>} A promise that resolves when the file has been removed.
+ * @throws {Error} If the file does not exist or the removal fails.
+ */
 export async function removeFile(path: string) {
   await rm(path);
 }
@@ -120,9 +154,9 @@ function convertToObject(tab: string | Array<string>, _obj?: {}) {
 }
 
 /**
- * Format size.
- * @param sizeInBytes size in octets
- * @returns Returns the size formatted.
+ * Formats the file size with the appropriate unit.
+ * @param sizeInBytes - Size in bytes
+ * @returns Returns the formatted size string (e.g., "1.5 MB")
  */
 function formatSize(sizeInBytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -137,12 +171,13 @@ function formatSize(sizeInBytes: number): string {
 }
 
 /**
- * Compare two values.
- * @param a
- * @param b
- * @returns Returns true if they are equal, false otherwise
+ * Compares two values for deep equality.
+ * Supports primitives, Date objects, and arrays.
+ * @param a - First value to compare
+ * @param b - Second value to compare
+ * @returns Returns true if values are deeply equal, false otherwise
  * @example
- *  console.log(isEqual(1, 2)); // true
+ *  console.log(isEqual(1, 2)); // false
  *  console.log(isEqual("hello", "hello")); // true
  *  console.log(isEqual(new Date(), new Date())); // true
  *  console.log(isEqual([1, 3, 2], [2, 1, 3])); // true
@@ -163,11 +198,11 @@ function isEqual(a: any, b: any) {
 }
 
 /**
- * Compares two values (namber or string, Date).
- * @param a
- * @param b
- * @param op operator, gt, gte, lt, lte
- * @returns returns a boolean, true or false
+ * Compares two values (number, string, or Date) using the specified operator.
+ * @param a - First value to compare
+ * @param b - Second value to compare
+ * @param op - Operator: "gt" (greater than), "gte" (greater or equal), "lt" (less than), "lte" (less or equal)
+ * @returns Returns true if the condition is met, false otherwise
  * @example
  * console.log(compare(2, 1, "gt")); // true
  * console.log(compare(1, 2, "gt")); // false

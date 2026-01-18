@@ -5,6 +5,7 @@ dev
 db
 public
 *db.json
+BUGS.md
 
 # Node dependencies
 node_modules

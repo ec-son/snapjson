@@ -62,9 +62,31 @@ describe("SnapJsonCLI", () => {
       process.argv = originalArgv;
     });
 
+    it("should show help with --help flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "--help"];
+
+      await cli.run();
+
+      expect(utils.showHelp).toHaveBeenCalled();
+
+      process.argv = originalArgv;
+    });
+
     it("should show version with -v flag", async () => {
       const originalArgv = process.argv;
       process.argv = ["node", "snapjson", "-v"];
+
+      await cli.run();
+
+      expect(utils.showVersion).toHaveBeenCalled();
+
+      process.argv = originalArgv;
+    });
+
+    it("should show version with --version flag", async () => {
+      const originalArgv = process.argv;
+      process.argv = ["node", "snapjson", "--version"];
 
       await cli.run();
 
@@ -88,7 +110,7 @@ describe("SnapJsonCLI", () => {
       process.argv = originalArgv;
     });
 
-    it("should show error for invalid create subcommand", async () => {
+    it("should show error for invalid create subcommand without arg: -r,-c", async () => {
       const originalArgv = process.argv;
       process.argv = ["node", "snapjson", "create"];
 

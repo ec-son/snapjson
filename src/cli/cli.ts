@@ -94,7 +94,7 @@ export class SnapJsonCLI {
       const pathDB = process.env.SNAPJSON_PATH_DB || "db";
       console.log(`\n⚠ Database already configured at path: ${pathDB}`);
       const overwrite = await question(
-        "Overwrite existing configuration? (yes/no): "
+        "Overwrite existing configuration? (yes/NO): "
       );
       if (overwrite.toLowerCase() !== "yes") {
         return;
@@ -130,7 +130,7 @@ export class SnapJsonCLI {
         const collectionName = await question("Enter collection name: ", true);
 
         const hasUniqueKeys = await question(
-          "Does this collection have unique keys? (yes/no): "
+          "Does this collection have unique keys? (yes/NO): "
         );
 
         let uniqueKeys: string[] = [];
@@ -155,10 +155,10 @@ export class SnapJsonCLI {
           | "uuid";
 
         const createdAtInput = await question(
-          "Add createdAt field? (yes/no): "
+          "Add createdAt field? (yes/NO): "
         );
         const updatedAtInput = await question(
-          "Add updatedAt field? (yes/no): "
+          "Add updatedAt field? (yes/NO): "
         );
 
         const collection = await orm.createCollection({
@@ -172,7 +172,7 @@ export class SnapJsonCLI {
         console.log(`✓ Collection "${collectionName}" created successfully!\n`);
 
         const continueCreating = await question(
-          "Create another collection? (yes/no): "
+          "Create another collection? (yes/NO): "
         );
         createMore = continueCreating.toLowerCase() === "yes";
       }
@@ -257,27 +257,62 @@ export class SnapJsonCLI {
           `Enter relation field (default: ${sourceCollection}):`
         );
 
-        let onDelete;
-        let onUpdate;
+        let onDelete: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" =
+          "SET NULL";
+        let onUpdate: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION" =
+          "CASCADE";
+        const validActions = ["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"];
 
-        while (
-          ["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"].includes(onDelete)
-        ) {
-          onDelete = (
+        // Get onDelete action
+        while (true) {
+          const input = (
             await question(
-              "Enter the referential action when deleting (CASCADE/SET NULL/RESTRICT/NO ACTION) (default: SET NULL)"
+              "Enter the referential action when deleting (CASCADE/SET NULL/RESTRICT/NO ACTION) (default: SET NULL): "
             )
-          ).toUpperCase() as any;
+          ).toUpperCase();
+
+          if (input === "") {
+            break;
+          }
+
+          if (validActions.includes(input)) {
+            onDelete = input as
+              | "CASCADE"
+              | "SET NULL"
+              | "RESTRICT"
+              | "NO ACTION";
+            break;
+          }
+
+          console.error(
+            "Invalid action. Please enter one of: CASCADE, SET NULL, RESTRICT, NO ACTION"
+          );
         }
 
-        while (
-          ["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"].includes(onUpdate)
-        ) {
-          onUpdate = (
+        // Get onUpdate action
+        while (true) {
+          const input = (
             await question(
-              "Enter the referential action when updating (CASCADE/SET NULL/RESTRICT/NO ACTION) (default: CASCADE)"
+              "Enter the referential action when updating (CASCADE/SET NULL/RESTRICT/NO ACTION) (default: CASCADE): "
             )
-          ).toUpperCase() as any;
+          ).toUpperCase();
+
+          if (input === "") {
+            break;
+          }
+
+          if (validActions.includes(input)) {
+            onUpdate = input as
+              | "CASCADE"
+              | "SET NULL"
+              | "RESTRICT"
+              | "NO ACTION";
+            break;
+          }
+
+          console.error(
+            "Invalid action. Please enter one of: CASCADE, SET NULL, RESTRICT, NO ACTION"
+          );
         }
 
         await orm.defineRelation(targetCollection, {
@@ -289,12 +324,13 @@ export class SnapJsonCLI {
           onDelete,
           onUpdate,
         });
+
         console.log(
-          `✓ Relation created: ${sourceCollection} -> ${targetCollection} (${relationType})\n`
+          `✓ Relation created: ${targetCollection} -> ${sourceCollection} (${relationType})\n`
         );
 
         const continueCreating = await question(
-          "Create another relation? (yes/no): "
+          "Create another relation? (yes/NO): "
         );
         createMore = continueCreating.toLowerCase() === "yes";
       }
