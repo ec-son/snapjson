@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { SnapJsonCLI } from "../cli/cli";
 
 // Run CLI

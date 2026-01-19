@@ -6,6 +6,7 @@ db
 public
 *db.json
 BUGS.md
+RELEASES.md
 
 # Node dependencies
 node_modules

@@ -2,7 +2,7 @@ import { defineCollection } from "../utils/shortcutFunc";
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
 import { DatabaseConfigType, DatabaseInfoOptionType } from "../types/orm.type";
-import { getOpts } from "src/utils/opts.func";
+import { getOpts } from "../utils/opts.func";
 
 export class Document<T extends Object> {
   private id: number = -1;
