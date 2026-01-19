@@ -1,8 +1,37 @@
-node_modules
 dist
+tasks.yaml
+*.tsbuildinfo
 dev
 db
+public
 *db.json
-src/test.*
+BUGS.md
+RELEASES.md
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local env files
 .env
-tasks.yaml
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

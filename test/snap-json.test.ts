@@ -1,389 +1,290 @@
+import { SnapJson } from "../src/lib/snapjson";
 import { Collection } from "../src/lib/collection";
-import {
-  SnapJson,
-  createCollection,
-  defineCollection,
-  removeCollection,
-} from "../src/lib/snapjson";
-import { DataBaseType, MetadataType } from "../src/types/orm.type";
-import * as utilsFun from "../src/utils/utils.func";
-import { convertToObject } from "../src/utils/utils.func";
+import { loadData } from "../src/utils/load-data";
+import { saveData } from "../src/utils/save-data";
+import { DatabaseInfoOptionType } from "../src/types/orm.type";
+import { sizeFile } from "../src/utils/utils.func";
 
-const mockLoadData = jest.spyOn(utilsFun, "loadData");
-const mockSaveData = jest.spyOn(utilsFun, "saveData");
+jest.mock("src/utils/load-data", () => ({
+  loadData: jest.fn(),
+}));
 
-const path_db = "path/db.json";
-const orm = new SnapJson(path_db);
-const db: DataBaseType = {
-  user: [
-    {
-      fullname: "john smith",
-      email: "john@example.com",
-      age: 20,
-    },
-    {
-      fullname: "crowly sm",
-      email: "crowly@example.com",
-      age: 25,
-    },
-  ],
-  __metadata__: [
-    {
-      collectionName: "user",
-      unique: ["email"],
-    },
-  ] as MetadataType<{ fullname: string; email: string; age: number }>[],
-};
+jest.mock("src/utils/save-data", () => ({
+  saveData: jest.fn(),
+}));
 
-mockLoadData.mockResolvedValue(structuredClone(db));
-mockSaveData.mockResolvedValue(void 0);
+jest.mock("../src/utils/utils.func");
 
-/***
+/**
  * getCollections
  * isExistCollection
- * testDatabase
  * pathDB
  *
  * createCollection
- * createCollection helper
  * createCollections
  * removeCollection
- * removeCollection helper
  * collection
- * defineCollection helper
  * size
  */
-describe("data base", () => {
-  it("should return an array collection names", async () => {
-    await expect(orm.getCollections()).resolves.toEqual(["user"]);
-  });
 
-  it("should return true if collection exists", async () => {
-    await expect(orm.isExistCollection("user")).resolves.toBeTruthy();
-  });
+describe("Snapjson", () => {
+  const mockDataBase = {
+    databaseInfo: { splitFile: false },
+    collectionInfo: [{ collectionName: "student", unique: [] }],
+    collectionData: [
+      { __id: 1, name: "Test Item 1" },
+      { __id: 2, name: "Test Item 2" },
+    ],
+  };
+  const mockOpts = {
+    path_db: "db",
+    mode: "dev",
+    encrypted: false,
+    splitFile: false,
+  } as Partial<
+    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
+  >;
 
-  it("should return false if collection doesn't exist", async () => {
-    await expect(orm.isExistCollection("student")).resolves.toBeFalsy();
-  });
-
-  it("should return path of database", () => {
-    const path = "root/db.json";
-    const _orm = new SnapJson(path);
-    expect(_orm.pathDB).toEqual(path);
-  });
-
-  it("should return a default path of database", () => {
-    expect(orm.pathDB).toEqual(path_db);
-  });
-
-  it("should call loadData function once", async () => {
-    expect(mockLoadData).toBeCalledTimes(1);
-  });
-
-  it("should return database size", async () => {
-    const mockSizeFile = jest.spyOn(utilsFun, "sizeFile");
-    mockSizeFile.mockResolvedValueOnce("1 KB");
-    await expect(orm.size()).resolves.toBe("1 KB");
-  });
-});
-
-describe("Collection", () => {
+  let snapjson: any;
   beforeEach(() => {
-    mockSaveData.mockClear();
-    mockSaveData.mockImplementationOnce((path_id, data) =>
-      Promise.resolve<any>(data)
+    snapjson = new SnapJson(mockOpts);
+    (loadData as jest.Mock).mockClear();
+    (saveData as jest.Mock).mockClear();
+    (loadData as jest.Mock).mockImplementation(
+      jest.fn(({ flag }) => {
+        if (flag === "orm-info")
+          return structuredClone(mockDataBase.databaseInfo);
+        else if (flag === "collection-info")
+          return structuredClone(mockDataBase.collectionInfo);
+        else return structuredClone(mockDataBase.collectionData[flag]);
+      })
     );
   });
 
   /**
-   * DEFINING COLLECTION
+   * TOOLS
    */
+  describe("Tools", () => {
+    it("should return path of database", () => {
+      expect(snapjson.pathDB).toEqual(mockOpts.path_db);
+    });
 
-  it("should create a new collection instance", async () => {
-    const expected = new Collection("user", path_db);
-    await expect(orm.collection("user")).resolves.toEqual(expected);
-  });
+    it("should return a default path of database", () => {
+      const orm = new SnapJson();
+      expect(orm.pathDB).toEqual("db");
+    });
 
-  it("should create a new collection instance", async () => {
-    mockLoadData.mockResolvedValueOnce(structuredClone(db));
-    const expected = new Collection("user1", path_db);
-    await expect(orm.collection("user1", true)).resolves.toEqual(expected);
-  });
-
-  it("should throw an error when collection doesn't exist", async () => {
-    await expect(orm.collection("user2")).rejects.toThrow();
+    it("should return database size", async () => {
+      (sizeFile as jest.Mock).mockResolvedValue("1 KB");
+      await expect(snapjson.size()).resolves.toBe("1 KB");
+      expect(sizeFile as jest.Mock).toBeCalledWith({
+        encrypted: false,
+        flag: "orm-info",
+        mode: "dev",
+        path_db: "db",
+        salt: undefined,
+        secretKey: undefined,
+        splitFile: false,
+      });
+    });
   });
 
   /**
-   * REMOVING COLLECTION FROM DATABASE
+   * COLLECTION
    */
 
-  const table1 = [
-    {
-      collections: "student1",
-      expected: "student1",
-    },
-    { collections: "student", data: [], expected: undefined },
-    { collections: "__metadata__", data: [], expected: undefined },
-    { collections: "user", data: [], force: true, expected: "user" },
-    {
-      collections: ["student1", "student2"],
-      expected: ["student1", "student2"],
-    },
-    {
-      collections: ["student1", "student2", "student3"],
-      expected: ["student1", "student3"],
-    },
-    {
-      collections: ["student1", "student3"],
-      data: ["student1", "student2", "student3"],
-      expected: ["student1", "student3"],
-    },
-  ];
-  it.each(structuredClone(table1))(
-    "should return a correct db after removing collections",
-    async ({ collections, expected, data, force }) => {
-      if (!data) data = Array.isArray(expected) ? expected : [expected];
-      const metadata = data.map((collectionName: string) => ({
-        collectionName,
-      }));
-
-      const _db = structuredClone(db);
-      convertToObject(data, _db);
-      _db["__metadata__"].push(...metadata);
-
-      mockLoadData.mockResolvedValueOnce(structuredClone(_db));
-      await expect(orm.removeCollection(collections, force)).resolves.toEqual(
-        expected
+  describe("Collection", () => {
+    it("should create a new collection instance", async () => {
+      await expect(snapjson.collection("student")).resolves.toBeInstanceOf(
+        Collection
       );
-    }
-  );
+    });
 
-  it.each(structuredClone(table1))(
-    "should remove collection from database",
-    async ({ collections, expected, data, force }) => {
-      if (!expected) return;
-      if (!data) data = Array.isArray(expected) ? expected : [expected];
-      const metadata = data.map((collectionName: string) => ({
-        collectionName,
-      }));
+    it("shouldn't throw an error when creating a new collection instance with force to true if collection doesn't exist", async () => {
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { collectionName: "student", unique: [] },
+      ]);
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { collectionName: "student", unique: [] },
+      ]);
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { collectionName: "student", unique: [] },
+        { collectionName: "user", unique: [] },
+      ]);
 
-      const _db = structuredClone(db);
-      convertToObject(data, _db);
-      _db["__metadata__"].push(...metadata);
+      await expect(snapjson.collection("user", true)).resolves.toBeInstanceOf(
+        Collection
+      );
+    });
 
-      const _data = data.filter((el) => {
-        return Array.isArray(expected)
-          ? !expected?.includes(el)
-          : expected !== el;
+    it("should throw an error when creating a new collection instance if collection doesn't exist", async () => {
+      await expect(snapjson.collection("user")).rejects.toThrow();
+    });
+
+    it("should create a new collection", async () => {
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { collectionName: "student", unique: [] },
+      ]);
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { collectionName: "student", unique: [] },
+        { collectionName: "user", unique: [] },
+      ]);
+
+      const result = await snapjson.createCollection("user");
+      expect(result).toBeInstanceOf(Collection);
+    });
+
+    it("shouldn't throw an error when creating a new collection instance with force to true if collection already exist", async () => {
+      const result = await snapjson.createCollection("student", true);
+      expect(result).toBeInstanceOf(Collection);
+    });
+
+    it("should throw an error when creating a new collection instance if collection already exist", async () => {
+      await expect(snapjson.createCollection("student")).rejects.toThrow();
+    });
+
+    it("should return collection after creating it as expected", async () => {
+      (loadData as jest.Mock).mockResolvedValue([
+        { collectionName: "student", unique: [] },
+        { collectionName: "user", unique: [] },
+      ]);
+
+      const expected1 = {
+        collectionName: "student",
+        createdAt: false,
+        idStrategy: "increment",
+        relations: [],
+        unique: [],
+        updatedAt: false,
+      };
+      const expected2 = {
+        collectionName: "user",
+        idStrategy: "increment",
+        unique: [],
+        createdAt: false,
+        updatedAt: false,
+        relations: [
+          {
+            collectionName: "student",
+            localKey: "userId",
+            foreignKey: "__id",
+            as: "student",
+            onDelete: "SET NULL",
+            onUpdate: "CASCADE",
+            relationType: "hasOne",
+          },
+        ],
+      };
+      const expected3: any = {
+        collectionName: "user",
+        idStrategy: "uuid",
+        createdAt: true,
+        updatedAt: true,
+        relations: [
+          {
+            collectionName: "student",
+            localKey: "userId",
+            foreignKey: "_id",
+            as: "students",
+            onDelete: "NO ACTION",
+            onUpdate: "SET DEFAULT",
+          },
+        ],
+      };
+
+      await snapjson.createCollection("student", true);
+      await (snapjson as SnapJson).createCollection(
+        {
+          collectionName: "user",
+          relations: { collectionName: "student" },
+        },
+        true
+      );
+      await (snapjson as SnapJson).createCollection(
+        { ...expected3, uniqueKeys: ["email"] },
+        true
+      );
+      await (snapjson as SnapJson).createCollection(
+        {
+          collectionName: "user",
+          relations: "student",
+        },
+        true
+      );
+
+      expect((saveData as jest.Mock).mock.calls[1][0][1]).toEqual(expected1);
+      expect((saveData as jest.Mock).mock.calls[3][0][1]).toEqual(expected2);
+      expect((saveData as jest.Mock).mock.calls[5][0][1]).toEqual({
+        ...expected3,
+        unique: ["email"],
+      });
+      expect((saveData as jest.Mock).mock.calls[7][0][1]).toEqual(expected2);
+    });
+
+    it("should remove collection from database", async () => {
+      (loadData as jest.Mock).mockImplementation(({ flag }) => {
+        if (flag === "collection-info")
+          return [{ collectionName: "user", unique: [] }];
+        else return [];
       });
 
-      const expectedDB =
-        expected === "user" ? { __metadata__: [] } : structuredClone(db);
-      convertToObject(_data, expectedDB);
-      expectedDB["__metadata__"].push(
-        ..._data.map((collectionName: string) => ({
-          collectionName,
-        }))
-      );
+      const result = await snapjson.removeCollection("user");
 
-      mockLoadData.mockResolvedValueOnce(structuredClone(_db));
-      await orm.removeCollection(collections, force);
-      expect(mockSaveData).toHaveBeenNthCalledWith(1, path_db, expectedDB);
-    }
-  );
-
-  it("should throw an error when removing collection which has items", async () => {
-    await expect(orm.removeCollection("user")).rejects.toThrow();
-  });
-
-  const table2 = ["user", ["user", "student", "teacher"]];
-  it.each(table2)(
-    "should return undefined when removing collection from database which has no collection",
-    async (collection) => {
-      const expected = Array.isArray(collection) ? [] : undefined;
-      mockLoadData.mockResolvedValueOnce({});
-      await expect(orm.removeCollection(collection)).resolves.toEqual(expected);
-    }
-  );
-
-  /**
-   * ADDING COLLECTION FROM DATABASE
-   */
-
-  const table3 = [
-    {
-      collections: "user",
-      expected: "user",
-      force: true,
-      metadata: { collectionName: "user", unique: [] },
-    },
-    {
-      collections: { collectionName: "student", unique: ["email"] },
-      expected: "student",
-      metadata: { collectionName: "student", unique: [] },
-    },
-    {
-      collections: ["user", "teacher", "teacher"],
-      force: true,
-      expected: ["user", "teacher"],
-      metadata: [
-        { collectionName: "user", unique: [] },
-        { collectionName: "teacher", unique: [] },
-      ],
-    },
-    { collections: [], expected: [] },
-    {
-      collections: [
-        { collectionName: "student", uniqueKeys: ["email", "name"] },
-        { collectionName: "student", uniqueKeys: ["email", "name"] },
-        { collectionName: "teacher", uniqueKeys: ["email"] },
-        { collectionName: "patient" },
-      ],
-      metadata: [
-        { collectionName: "student", unique: ["email", "name"] },
-        { collectionName: "teacher", unique: ["email"] },
-        { collectionName: "patient", unique: [] },
-      ],
-      expected: ["student", "teacher", "patient"],
-    },
-  ];
-
-  it.each(structuredClone(table3))(
-    "should return the created collection",
-    async ({ collections, expected, force }) => {
-      const _db = structuredClone(db);
-      mockLoadData.mockResolvedValueOnce(_db);
-      if (Array.isArray(collections)) {
-        const _expected = (expected as Array<string>).map(
-          (el) => new Collection(el, path_db)
-        );
-        await expect(
-          orm.createCollections(collections as string[], force)
-        ).resolves.toEqual(_expected);
-      } else
-        await expect(
-          orm.createCollection(collections as string, force)
-        ).resolves.toEqual(new Collection(expected as string, path_db));
-    }
-  );
-
-  it.each(structuredClone(table3))(
-    "should return a correct object after adding a new collection",
-    async ({ collections, force, metadata, expected }) => {
-      if (!metadata) return;
-      const _db = structuredClone(db);
-      const expectedObject = structuredClone(db);
-      if (!Array.isArray(metadata)) (metadata as any) = [metadata];
-
-      convertToObject(expected, expectedObject);
-      if (
-        expected === "user" ||
-        (Array.isArray(expected) && (expected as string[]).includes("user"))
-      )
-        expectedObject["__metadata__"] = [];
-      expectedObject["__metadata__"].push(...(metadata as any));
-
-      mockLoadData.mockResolvedValueOnce(_db);
-      await orm.createCollection(collections as string, force);
-
-      expect(mockSaveData).toHaveBeenNthCalledWith(1, path_db, expectedObject);
-    }
-  );
-
-  const table4 = [undefined, "user", "__metadata__"];
-
-  it.each(table4)(
-    "should throw an error when creating collection",
-    async (collection) => {
-      const _db = structuredClone(db);
-      mockLoadData.mockResolvedValueOnce(_db);
-      await expect(
-        orm.createCollection(collection as string)
-      ).rejects.toThrow();
-    }
-  );
-
-  it.each(table2)(
-    "should return undefined when removing collection from database which has no collection",
-    async (collection) => {
-      const _collection = structuredClone(collection);
-      if (!Array.isArray(collection)) collection = [collection];
-
-      const metadata = collection.map((el) => ({
-        collectionName: el,
-        unique: [],
-      }));
-      const db = convertToObject(collection);
-      db["__metadata__"] = metadata;
-
-      mockLoadData.mockResolvedValueOnce({});
-
-      if (Array.isArray(_collection)) await orm.createCollections(_collection);
-      else await orm.createCollection(_collection as string);
-
-      expect(mockSaveData).toHaveBeenNthCalledWith(1, path_db, db);
-    }
-  );
-});
-
-/**
- * MANAGEMENT COLLECTION WITH HELPER FUNCTION
- */
-
-describe("management collection with helper function", () => {
-  it("should return a created collection as instance", async () => {
-    const expected = new Collection("collection1", path_db);
-    await expect(createCollection("collection1", path_db)).resolves.toEqual(
-      expected
-    );
-  });
-
-  it("should return a created collections as array of instance", async () => {
-    const expected = [
-      new Collection("collection2", path_db),
-      new Collection("collection3", path_db),
-    ];
-    await expect(
-      createCollection(["collection2", "collection3"], path_db)
-    ).resolves.toEqual(expected);
-  });
-
-  it("should create a new collection instance", async () => {
-    const expected = new Collection("user", path_db);
-    await expect(defineCollection("user", path_db)).resolves.toEqual(expected);
-  });
-
-  it("should create a new collection instance", async () => {
-    mockLoadData.mockResolvedValueOnce(structuredClone(db));
-    const expected = new Collection("user1", path_db);
-    await expect(defineCollection("user1", path_db, true)).resolves.toEqual(
-      expected
-    );
-  });
-
-  it("should throw an error when collection doesn't exist", async () => {
-    await expect(defineCollection("user2", path_db)).rejects.toThrow();
-  });
-
-  const table1 = ["collection", ["collection1", "collection2"]];
-  it.each(table1)("should return a deleted collection", async (opt) => {
-    let collection = opt;
-    const expected = structuredClone(opt);
-    if (!Array.isArray(collection)) collection = [opt] as any;
-    const _col = {} as any;
-    (collection as Array<string>).forEach((element) => {
-      _col[element] = [];
+      expect(result).toEqual("user");
+      expect(saveData as jest.Mock).toHaveBeenCalledWith([], {
+        path_db: "db",
+        mode: "dev",
+        splitFile: false,
+        encrypted: false,
+        secretKey: undefined,
+        salt: undefined,
+        flag: "collection-info",
+      });
     });
-    const _db: DataBaseType = {
-      ..._col,
-      __metadata__: (collection as Array<string>).map((collectionName) => ({
-        collectionName,
-        unique: [],
-      })),
-    };
 
-    mockLoadData.mockResolvedValueOnce(_db);
-    await expect(removeCollection(opt)).resolves.toEqual(expected);
+    it("should remove many collections from database", async () => {
+      (loadData as jest.Mock).mockImplementation(({ flag }) => {
+        if (flag === "collection-info")
+          return [
+            { collectionName: "user", unique: [] },
+            { collectionName: "action", unique: [] },
+          ];
+        else return [];
+      });
+
+      const result = await snapjson.removeCollection(["user", "action"]);
+
+      expect(result).toEqual(["user", "action"]);
+    });
+
+    it("should throw an error when removing collection having data", async () => {
+      (loadData as jest.Mock).mockImplementation(({ flag }) => {
+        if (flag === "collection-info")
+          return [{ collectionName: "user", unique: [] }];
+        else return [{ __id: 1, name: "smith" }];
+      });
+
+      await expect(snapjson.removeCollection("user")).rejects.toThrow();
+    });
+
+    it("should add collection even if it has data", async () => {
+      (loadData as jest.Mock).mockImplementation(({ flag }) => {
+        if (flag === "collection-info")
+          return [{ collectionName: "user", unique: [] }];
+        else return [{ __id: 1, name: "smith" }];
+      });
+
+      const result = await snapjson.removeCollection("user", true);
+
+      expect(result).toEqual("user");
+    });
+
+    it("should return an array collection names", async () => {
+      await expect(snapjson.getCollections()).resolves.toEqual(["student"]);
+    });
+
+    it("should return true if collection exists", async () => {
+      await expect(snapjson.isExistCollection("user")).resolves.toBeFalsy();
+    });
   });
 });

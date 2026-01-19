@@ -1,77 +1,24 @@
-import * as utilsFun from "../src/utils/utils.func";
 import { Collection } from "../src/lib/collection";
-import { SnapJson, defineCollection } from "../src/lib/snapjson";
-import { DataBaseType, MetadataType, QueryType } from "../src/types/orm.type";
+import { loadData } from "../src/utils/load-data";
+import { saveData } from "../src/utils/save-data";
+import { SnapJson } from "../src/lib/snapjson";
+import * as shortcutFunc from "../src/utils/shortcutFunc";
+import { DatabaseInfoOptionType } from "../src/types/orm.type";
+import { Document } from "../src/lib/document";
 
-const mockLoadData = jest.spyOn(utilsFun, "loadData");
-const mockSaveData = jest.spyOn(utilsFun, "saveData");
+jest.mock("src/utils/load-data", () => ({
+  loadData: jest.fn(),
+}));
 
-const factoryDocument = (
-  document:
-    | userType
-    | Partial<userType>
-    | Array<userType>
-    | Array<Partial<userType>>,
-  path?: string
-) => utilsFun.defineDocument(document, path || path_db, "user");
+jest.mock("src/utils/save-data", () => ({
+  saveData: jest.fn(),
+}));
 
-interface userType {
-  __id: number;
-  firstName: string;
-  email: string;
-  age?: number;
-}
-
-interface queryType extends QueryType<Partial<userType>> {
-  id?: number | number[];
-}
-
-const path_db = "path/db.json";
-const orm = new SnapJson(path_db);
-let user: Collection<Pick<userType, Exclude<keyof userType, "__id">>>;
-const db: DataBaseType = {
-  user: [
-    {
-      __id: 1,
-      firstName: "John",
-      email: "john@example.com",
-      age: 21,
-    },
-    {
-      __id: 2,
-      firstName: "Rick",
-      email: "rick@example.com",
-      age: 18,
-    },
-    {
-      __id: 3,
-      firstName: "Carl",
-      email: "carl@example.com",
-      age: 25,
-    },
-    {
-      __id: 4,
-      firstName: "Crowly",
-      email: "crowly@example.com",
-      age: 15,
-    },
-    {
-      __id: 5,
-      firstName: "Betty",
-      email: "betty@example.com",
-      age: 21,
-    },
-  ],
-  __metadata__: [
-    {
-      collectionName: "user",
-      unique: ["email"],
-    },
-  ] as MetadataType<userType>[],
-};
-
-mockLoadData.mockResolvedValue(db);
-mockSaveData.mockResolvedValue(void 0);
+jest.mock("../src/lib/snapjson", () => ({
+  SnapJson: jest.fn().mockImplementation(() => ({
+    isExistCollection: jest.fn().mockReturnValue(true),
+  })),
+}));
 
 /**
  * Collection class
@@ -85,7 +32,7 @@ mockSaveData.mockResolvedValue(void 0);
  *
  * add
  * create
- * inserOne
+ * insertOne
  * insertMany
  *
  * updateOne
@@ -100,502 +47,410 @@ mockSaveData.mockResolvedValue(void 0);
  * removeAllUniqueKeys
  */
 
-beforeAll(async () => {
-  user = await orm.collection<Pick<userType, Exclude<keyof userType, "__id">>>(
-    "user"
-  );
-});
-
-beforeEach(() => {
-  mockLoadData.mockResolvedValue(structuredClone(db));
-  mockSaveData.mockClear();
-  mockSaveData.mockImplementationOnce((path_id, data) =>
-    Promise.resolve<any>(data)
-  );
-});
-
-/**
- * COLLECTION CLASS
- */
-
-describe("collection instance", () => {
-  it("should return a collection instance", async () => {
-    const _user = await defineCollection("user", path_db);
-    expect(new Collection("user", path_db)).toEqual(_user);
-  });
-
-  const table1 = [undefined, "", "collectionNotFound"];
-
-  it.each(table1)(
-    "throw an error when collection doesn't exist",
-    async (collectionName) => {
-      const collection = new Collection(collectionName as string, path_db);
-      await expect(collection.count()).rejects.toThrow();
-    }
-  );
-
-  it("should create a new collection withput suppliying the path", () => {
-    const collection = new Collection("user");
-    expect(collection.pathDB).toBe("db/db.json");
-  });
-});
-
-/**
- * TOOLS
- */
-
-describe("tools methods of collection", () => {
-  it("should return a last id", async () => {
-    await expect(user.lastInsertId()).resolves.toBe(5);
-  });
-
-  it("should return path of database", async () => {
-    const path = "root/db.json";
-    const _user = await defineCollection("user", path);
-    expect(_user.pathDB).toEqual(path);
-  });
-
-  it("should return a default path of database", () => {
-    expect(user.pathDB).toEqual(path_db);
-  });
-
-  it("should return collection name", () => {
-    expect(user.collectionName).toEqual("user");
-  });
-
-  it("should return collection size", async () => {
-    await expect(user.size()).resolves.toBe("337 B");
-  });
-
-  it("should return number of documents", async () => {
-    await expect(user.count()).resolves.toBe(5);
-  });
-});
-
-/**
- * SELECT
- */
-
-describe("selecting documents from database", () => {
-  it("should select document by id", async () => {
-    await expect(user.findById(3)).resolves.toHaveProperty("__id", 3);
-  });
-
-  const table1: queryType[] = [
-    { __id: 1, firstName: "John", email: "john@example.com", id: 1 },
-    { __id: { $gt: 1 }, id: 2 },
-    { __id: { $gte: 2 }, id: 2 },
-    { __id: { $lt: 5 }, id: 1 },
-    { __id: { $lte: 5 }, id: 1 },
-    { __id: { $gt: 1, $lt: 5 }, id: 2 },
-    { email: { $ne: "john@example.com" }, id: 2 },
-    { email: /ly@ex/, id: 4 },
-    { $and: [{ age: 21 }, { email: { $eq: /tty/ } }], id: 5 },
-    { $or: [{ age: 18 }, { age: 25 }], id: 2 },
+describe("Collection class", () => {
+  const collectionName = "testCollection";
+  const collectionInfo = [
+    { collectionName: "testCollection", unique: [], relations: [] },
   ];
+  const mockCollectionData = [
+    { __id: 1, name: "Test Item 1" },
+    { __id: 2, name: "Test Item 2" },
+  ];
+  const mockOpts = {
+    path_db: "db",
+    mode: "dev",
+    encrypted: false,
+    splitFile: false,
+    flag: collectionName,
+  } as Partial<
+    Pick<DatabaseInfoOptionType, Exclude<keyof DatabaseInfoOptionType, "flag">>
+  >;
 
-  it.each(table1)("should return the correct document", async (opts) => {
-    const { id, ...query } = opts;
-    const expected = structuredClone(
-      (db["user"] as Array<userType>).find((el) => el.__id === id)
+  let collection: any
+  let defineDocument: any;
+  const isNow = (date: string): boolean => {
+    return (
+      new Date(date).toISOString().split("T")[0] ===
+      new Date().toISOString().split("T")[0]
     );
-    await expect(user.findOne(query)).resolves.toEqual(
-      factoryDocument(expected!)
+  };
+
+  beforeEach(() => {
+    collection = new Collection(collectionName, mockOpts);
+    (loadData as jest.Mock).mockClear();
+    (saveData as jest.Mock).mockClear();
+
+    (loadData as jest.Mock).mockImplementation(
+      jest.fn(({ flag }) => {
+        if (flag === "orm-info") return structuredClone({ splitFile: false });
+        else if (flag === "collection-info")
+          return structuredClone(collectionInfo);
+        else return structuredClone(mockCollectionData);
+      })
     );
+
+    defineDocument = jest.spyOn(shortcutFunc, "defineDocument");
+    (defineDocument as jest.Mock).mockImplementation((t) => t);
   });
 
-  const table2: queryType[] = [
-    { age: 21, id: [1, 5] },
-    { age: { $gte: 15, $lt: 20 }, id: [2, 4] },
-    {
-      $or: [
-        { age: { $gt: 21 } },
-        { age: { $lte: 15 } },
-        { firstName: { $eq: "Betty" } },
-      ],
-      id: [3, 4, 5],
-    },
-  ];
+  /**
+   * INSERTING
+   */
 
-  it.each(table2)(
-    "should return an array of entities that match the given query",
-    async (opts) => {
-      const { id, ...query } = opts;
-      const expected = (db["user"] as Array<userType>).filter((el) => {
-        return (id as Array<number>).includes(el.__id);
+  describe("Inserting", () => {
+    const mockData = { name: "Test Item 3" };
+    it("should insert data and return a document with add method", async () => {
+      const result = await collection.add(mockData);
+
+      expect(loadData).toHaveBeenCalledWith(mockOpts);
+      expect(defineDocument).toHaveBeenCalled();
+      expect(result).toEqual({ __id: "3", ...mockData });
+      expect(saveData).toHaveBeenCalled();
+    });
+
+    it("should insert data and return a document with inserOne method", async () => {
+      (loadData as jest.Mock).mockResolvedValueOnce([]);
+
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        {
+          collectionName: "testCollection",
+          idStrategy: "uuid",
+          unique: [],
+          createdAt: true,
+          relations: [],
+        },
+      ]);
+
+      const result = await collection.insertOne(structuredClone(mockData));
+
+      expect(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          result.__id
+        )
+      ).toBeTruthy();
+
+      expect(isNow(result.createdAt)).toBeTruthy();
+    });
+
+    it("should insert data and return a document with create method", async () => {
+      const result = await collection.create(mockData);
+      expect(result).toEqual({ __id: "3", ...mockData });
+    });
+
+    it("should insert an array of data and return an array of document with insertMany method", async () => {
+      const result = await collection.insertMany([mockData]);
+
+      expect(result).toEqual([{ __id: "3", ...mockData }]);
+    });
+
+    it("should throw error when creating a new document, constrain", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [
+              {
+                collectionName: "testCollection",
+                unique: ["name"],
+                relations: [],
+              },
+            ];
+          return structuredClone(mockCollectionData);
+        })
+      );
+
+      await expect(
+        collection.insertOne({ name: "Test Item 1" })
+      ).rejects.toThrowError("Connot duplicate 'name' field as unique key");
+    });
+  });
+
+  /**
+   * UPDATING
+   */
+
+  describe("Updating", () => {
+    it("should update a document and return the updated document with updateOne method", async () => {
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        { __id: 1, name: "Test Item 1" },
+        { __id: 2, name: "Test Item 2" },
+      ]);
+
+      (loadData as jest.Mock).mockResolvedValueOnce([
+        {
+          collectionName: "testCollection",
+          unique: [],
+          updatedAt: true,
+          relations: [],
+        },
+      ]);
+
+      const mockData = { name: "Updated Item" };
+      const result = await collection.updateOne(mockData, { __id: 1 });
+
+      expect(result).toEqual({
+        __id: 1,
+        name: "Updated Item",
+        updatedAt: result.updatedAt,
       });
 
-      await expect(user.find(query)).resolves.toEqual(
-        factoryDocument(expected)
+      expect(isNow(result.updatedAt)).toBeTruthy();
+    });
+
+    it("should update an array of document and return an array of updated documents with updateMany method", async () => {
+      const result = await collection.updateMany(
+        { name: "Updated Item" },
+        {
+          __id: 1,
+        }
       );
-    }
-  );
 
-  it("should return an object with firstName property only", async () => {
-    const document = (
-      await user.findOne({ __id: 1 }, { select: ["firstName"] })
-    )?.toObject();
-    expect(document).toEqual({ firstName: "John" });
-  });
+      expect(result).toEqual([{ __id: 1, name: "Updated Item" }]);
+    });
 
-  it("should return an sorted array of documents", async () => {
-    const expected = [
-      { age: 25 },
-      { age: 21 },
-      { age: 21 },
-      { age: 18 },
-      { age: 15 },
-    ];
-    await expect(
-      user.find(
-        { $or: [{ age: { $in: [25, 21] } }, { age: { $lte: 20 } }] },
-        { select: ["age"], sort: { flag: "desc", property: "age" } }
-      )
-    ).resolves.toEqual(factoryDocument(expected));
-  });
+    it("should throw error when update, constrain", async () => {
+      const mockData = { name: "Test Item1" };
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [
+              {
+                collectionName: "testCollection",
+                unique: ["name"],
+                relations: [],
+              },
+            ];
+          return structuredClone(mockCollectionData);
+        })
+      );
 
-  it("should return 3 documents", async () => {
-    const length = (await user.find({}, { limit: 3 })).length;
-    expect(length).toBe(3);
-  });
+      await expect(
+        collection.updateOne({ name: "Test Item 2" }, { __id: 1 })
+      ).rejects.toThrowError("Connot duplicate 'name' field as unique key");
+    });
 
-  it("should begin to search from 4th document", async () => {
-    const documents = (await user.find({}, { offset: 3 })).map((el) =>
-      el.toObject()
-    );
+    it("should return null if no document is found to update", async () => {
+      (loadData as jest.Mock).mockResolvedValue([]);
 
-    const expected = [
-      { __id: 4, age: 15, email: "crowly@example.com", firstName: "Crowly" },
-      { __id: 5, age: 21, email: "betty@example.com", firstName: "Betty" },
-    ];
-    expect(documents).toEqual(expected);
-  });
+      const result = await collection.updateOne(
+        { name: "Updated Item" },
+        { __id: 1 }
+      );
 
-  it("should return array", async () => {
-    const documents = await user.find({}, { limit: 1 });
-    expect(Array.isArray(documents)).toBeTruthy();
-  });
-});
-
-/**
- * INSERT
- */
-
-describe("inserting documents into database", () => {
-  const table1 = [
-    { firstName: "item1", email: "item1@example.com", age: 36 },
-    { firstName: "item2", email: "item2@example.com" },
-  ];
-
-  it.each(table1)("should return created document", async (document) => {
-    await expect(user.insertOne(document)).resolves.toEqual(
-      factoryDocument({ ...document, __id: (await user.lastInsertId()) + 1 })
-    );
-  });
-
-  const table2 = ["insertOne", "add", "create"] as const;
-  it.each(table2)("should insert document into database", async (method) => {
-    const document = {
-      firstName: "item3",
-      email: `${method}@example.com`,
-      age: 36,
-    };
-    await user[method](document);
-    expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual({
-      ...document,
-      __id: await user.lastInsertId(),
+      expect(result).toBeNull();
     });
   });
 
-  it("should throw error when creating a new document, constrain", async () => {
-    const document = { firstName: "John", email: "john@example.com" };
-    await expect(user.insertOne(document)).rejects.toThrow();
-  });
+  /**
+   * DELETING
+   */
 
-  it("should return created entities", async () => {
-    const items: Pick<userType, Exclude<keyof userType, "__id">>[] = [
-      { firstName: "item6", email: "item6@example.com", age: 36 },
-      { firstName: "item7", email: "item7@example.com" },
-    ];
-    await expect(user.insertMany(items)).resolves.toContainEqual(
-      factoryDocument({ ...items[1], __id: 7 })
-    );
-  });
+  describe("Deleting", () => {
+    it("should delete a document and return it", async () => {
+      (loadData as jest.Mock).mockResolvedValueOnce(
+        structuredClone(mockCollectionData)
+      );
 
-  it("should insert multiple entities", async () => {
-    let __id = await user.lastInsertId();
-    const items: Pick<userType, Exclude<keyof userType, "__id">>[] = [
-      { firstName: "item7", email: "item7@example.com" },
-      { firstName: "item8", email: "item8@example.com", age: 36 },
-    ];
+      const result = await collection.deleteOne({ __id: 1 });
 
-    const expected = items.map<Record<string, any>>((el) => {
-      __id++;
-      return { ...el, __id };
+      expect(result).toEqual(mockCollectionData[0]);
     });
 
-    await user.insertMany(items);
-    expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual(expected[1]);
-  });
-});
-
-/**
- * UPDATE
- */
-
-describe("updating entities from database", () => {
-  const table1: queryType[] = [
-    { __id: 1, firstName: "John", email: "john@example.com", id: 1 },
-    { email: { $ne: "john@example.com" }, id: 2 },
-  ];
-
-  it.each(table1)("should return updated document", async (opts) => {
-    const { id, ...query } = opts;
-    const expected = structuredClone(
-      (db["user"] as Array<userType>).find((el) => el.__id === id)
-    );
-
-    expected!.age = 30;
-    await expect(user.updateOne({ age: 30 }, query)).resolves.toEqual(
-      factoryDocument(expected!)
-    );
-  });
-
-  it("should update document from database", async () => {
-    const expected = {
-      __id: 4,
-      firstName: "Crowly",
-      email: "crowly@example.com",
-      age: 35,
-    };
-
-    await user.updateOne({ age: 35 }, { __id: 4 });
-    expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual(expected);
-  });
-
-  it("should throw an error when update, constrain", async () => {
-    await expect(
-      user.updateOne({ email: "rick@example.com" }, { __id: 1 })
-    ).rejects.toThrow();
-  });
-
-  it("should return updated entities", async () => {
-    const age = 30;
-    const expected = [
-      { __id: 3, firstName: "Carl", email: "carl@example.com", age },
-      {
-        __id: 4,
-        firstName: "Crowly",
-        email: "crowly@example.com",
-        age,
-      },
-    ];
-
-    await expect(
-      user.updateMany({ age }, { age: { $in: [25, 15] } })
-    ).resolves.toEqual(factoryDocument(expected));
-  });
-
-  it("should update entities from database", async () => {
-    const age = 50;
-    const expected = [
-      { __id: 3, firstName: "Carl", email: "carl@example.com", age },
-      {
-        __id: 4,
-        firstName: "Crowly",
-        email: "crowly@example.com",
-        age,
-      },
-    ];
-
-    await user.updateMany({ age }, { age: { $in: [25, 15] } });
-    expect(mockSaveData.mock.calls[0][1]["user"]).toContainEqual(expected[1]);
-  });
-});
-
-/**
- * DELETE
- */
-
-describe("deleting entities from database", () => {
-  const table1: queryType[] = [
-    { __id: 1, firstName: "John", email: "john@example.com", id: 1 },
-    { email: { $ne: "john@example.com" }, id: 2 },
-  ];
-
-  it.each(table1)("should return deleted  document", async (opts) => {
-    const { id, ...query } = opts;
-    let expected = structuredClone(
-      (db["user"] as Array<userType>).find((el) => el.__id === id)
-    );
-
-    expected = utilsFun.defineDocument(
-      expected as queryType,
-      path_db,
-      "user"
-    ) as any;
-    await expect(user.deleteOne(query)).resolves.toEqual(expected);
-  });
-
-  it("should delete document from database", async () => {
-    const expected = {
-      __id: 4,
-      age: 15,
-      email: "crowly@example.com",
-      firstName: "Crowly",
-    };
-    await user.deleteOne({ __id: 4 });
-    expect(mockSaveData.mock.calls[0][1]["user"]).not.toContainEqual(expected);
-  });
-
-  it("should return deleted entities", async () => {
-    let expected = [
-      { __id: 1, age: 21, email: "john@example.com", firstName: "John" },
-      { __id: 5, age: 21, email: "betty@example.com", firstName: "Betty" },
-    ];
-
-    expected = utilsFun.defineDocument(expected, path_db, "user") as any;
-    await expect(user.deleteMany({ age: 21 })).resolves.toEqual(expected);
-  });
-
-  it("should delete entities from database", async () => {
-    const expected = {
-      __id: 5,
-      firstName: "Betty",
-      email: "betty@example.com",
-      age: 21,
-    };
-
-    await user.deleteMany({ age: 21 });
-    expect(mockSaveData.mock.calls[0][1]["user"]).not.toContainEqual(expected);
-  });
-});
-
-describe("unique properties", () => {
-  it("should return unique properties", async () => {
-    await expect(user.getUniqueKeys()).resolves.toEqual(["email"]);
-  });
-
-  it("should return an empty array when no property found.", async () => {
-    await user.removeAllUniqueKeys();
-    await expect(user.getUniqueKeys()).resolves.toEqual([]);
-  });
-
-  // ADDING UNIQUE KEY
-
-  it("should add an unique keys", async () => {
-    const expected = {
-      collectionName: "user",
-      unique: ["email", "firstName"],
-    };
-
-    await user.addUniqueKey("firstName");
-    expect(mockSaveData.mock.calls[0][1]["__metadata__"]).toContainEqual(
-      expected
-    );
-  });
-
-  const table1 = ["lastName", ["email", "firstName"]];
-
-  it.each(structuredClone(table1))(
-    "should add an unique keys / array",
-    async (unique) => {
-      if (!Array.isArray(unique)) unique = [unique];
-      const expected = {
-        collectionName: "user",
-        unique,
-      };
-
-      await user.removeAllUniqueKeys();
-      await user.addUniqueKey(unique as any);
-      expect(mockSaveData.mock.calls[0][1]["__metadata__"]).toContainEqual(
-        expected
+    it("should delete many documents and return them", async () => {
+      (loadData as jest.Mock).mockResolvedValue(
+        structuredClone(mockCollectionData)
       );
-    }
-  );
 
-  it("should skip when unique keys is already added", async () => {
-    await user.addUniqueKey("email");
-    expect(mockSaveData).not.toBeCalled();
+      const result = await collection.deleteMany({
+        __id: { $lte: 2 },
+      });
+
+      expect(result).toEqual(mockCollectionData);
+    });
+
+    it("should return null if no document is found to delete", async () => {
+      (loadData as jest.Mock).mockResolvedValue([]);
+
+      const result = await collection.deleteOne({ __id: 1 });
+
+      expect(result).toBeNull();
+    });
   });
 
-  it("should return added unique keys", async () => {
-    await expect(user.addUniqueKey("age")).resolves.toBe("age");
-  });
+  /**
+   * SELECTING
+   */
 
-  it.each(structuredClone(table1))(
-    "should return added unique keys / array",
-    async (unique) => {
-      await expect(user.addUniqueKey(unique as any)).resolves.toEqual(unique);
-    }
-  );
-
-  // REMOVING UNIQUE keys
-
-  it("should remove an unique keys", async () => {
-    const expected = {
-      collectionName: "user",
-      unique: [],
-    };
-    await user.removeUniqueKey("email");
-
-    expect(mockSaveData.mock.calls[0][1]["__metadata__"]).toContainEqual(
-      expected
-    );
-  });
-
-  it.each(structuredClone(table1))(
-    "should remove an unique keys / array",
-    async (unique) => {
-      await user.addUniqueKey(unique as any);
-      if (!Array.isArray(unique)) unique = [unique];
-      const expected = {
-        collectionName: "user",
-        unique: unique.includes("email") ? [] : ["email"],
-      };
-
-      await user.removeUniqueKey(unique as any);
-      expect(mockSaveData.mock.calls[0][1]["__metadata__"]).toContainEqual(
-        expected
+  describe("Selecting", () => {
+    it("should return document by id with findById method", async () => {
+      (defineDocument as jest.Mock).mockRestore();
+      (loadData as jest.Mock).mockResolvedValue(
+        structuredClone(mockCollectionData)
       );
-    }
-  );
+      const result = await collection.findById(1);
+      expect(result).toBeInstanceOf(Document);
+    });
 
-  it("should return deleted unique keys", async () => {
-    await expect(user.removeUniqueKey("email")).resolves.toBe("email");
-  });
-
-  it.each(structuredClone(table1))(
-    "should return deleted unique keys / array",
-    async (unique) => {
-      await user.addUniqueKey(unique as any);
-      await expect(user.removeUniqueKey(unique as any)).resolves.toEqual(
-        unique
+    it("should return a document as json with findOne method", async () => {
+      (loadData as jest.Mock).mockResolvedValue(
+        structuredClone(mockCollectionData)
       );
-    }
-  );
+      const result = await (collection as Collection<any>).findOne(
+        { __id: { $lte: 2 } },
+        { type: "json" }
+      );
 
-  it("should return undefined when a provided unique keys is not found", async () => {
-    await expect(user.removeUniqueKey("age")).resolves.toBe(undefined);
+      expect(result).toEqual(JSON.stringify(mockCollectionData[0]));
+    });
+
+    it("should return many documents as object with find method", async () => {
+      (loadData as jest.Mock).mockResolvedValue(
+        structuredClone(mockCollectionData)
+      );
+      const result = await collection.find(
+        { __id: { $lte: 2 } },
+        { type: "object" }
+      );
+
+      expect(result).toEqual(mockCollectionData);
+    });
+
+    it("should return undefined if no document found", async () => {
+      (loadData as jest.Mock).mockResolvedValue([]);
+
+      const result = await collection.findById(1);
+
+      expect(result).toBeUndefined();
+    });
   });
 
-  it("should return all removed unique keys", async () => {
-    const uniqueKeys = ["email", "age", "firstName"] as Array<
-      keyof Pick<userType, Exclude<keyof userType, "__id">>
-    >;
-    await user.addUniqueKey(uniqueKeys);
-    await expect(user.removeAllUniqueKeys()).resolves.toEqual(uniqueKeys);
+  /**
+   * TOOLS
+   */
+
+  describe("Tools", () => {
+    it("should throw an error if collection doesn't exit when instantiating with force to true", async () => {
+      (SnapJson as jest.Mock).mockImplementationOnce(() => ({
+        isExistCollection: jest.fn().mockReturnValue(false),
+      }));
+
+      expect(() => new Collection("foo")).toThrowError(
+        "Collection 'foo' doesn't exist."
+      );
+    });
+
+    it("should return a default path of database", () => {
+      expect(collection.pathDB).toEqual(mockOpts.path_db);
+    });
+
+    it("should return collection name", () => {
+      expect(collection.collectionName).toEqual(collectionName);
+    });
+
+    it("should return collection size", async () => {
+      await expect(collection.size()).resolves.toBe("65 B");
+    });
+
+    it("should return number of documents", async () => {
+      await expect(collection.count()).resolves.toBe(2);
+    });
+
+    // it("should return a last id", async () => {
+    //   await expect(collection.lastInsertId()).resolves.toBe(2);
+    // });
   });
 
-  it("should remove all unique keys", async () => {
-    const expected = {
-      collectionName: "user",
-      unique: [],
-    };
+  /**
+   * UNIQUE KEY
+   */
 
-    await user.removeAllUniqueKeys();
-    expect(mockSaveData.mock.calls[0][1]["__metadata__"]).toContainEqual(
-      expected
-    );
+  describe("Unique key", () => {
+    it("should return unique keys", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [{ collectionName: "testCollection", unique: ["name"] }];
+          return structuredClone(mockCollectionData);
+        })
+      );
+      await expect(collection.getUniqueKeys()).resolves.toEqual(["name"]);
+    });
+
+    it("should remove unique key", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [{ collectionName: "testCollection", unique: ["name"] }];
+          return structuredClone(mockCollectionData);
+        })
+      );
+      const result = await collection.removeUniqueKey("name");
+
+      expect(result).toEqual("name");
+    });
+
+    it("should remove all unique keys", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [{ collectionName: "testCollection", unique: ["name"] }];
+          return structuredClone(mockCollectionData);
+        })
+      );
+      const result = await collection.removeAllUniqueKeys();
+
+      expect(result).toEqual(["name"]);
+      expect((saveData as jest.Mock).mock.calls[0][0][0]["unique"]).toEqual([]);
+    });
+
+    it("should add an unique key", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [{ collectionName: "testCollection", unique: [] }];
+          return structuredClone(mockCollectionData);
+        })
+      );
+
+      const result = await collection.addUniqueKey("name");
+
+      expect(result).toEqual("name");
+      expect((saveData as jest.Mock).mock.calls[0][0][0]["unique"]).toEqual([
+        "name",
+      ]);
+    });
+
+    it("should add many unique keys", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [{ collectionName: "testCollection", unique: [] }];
+          return structuredClone(mockCollectionData);
+        })
+      );
+      const result = await collection.addUniqueKey(["name"]);
+      expect(result).toEqual(["name"]);
+      expect((saveData as jest.Mock).mock.calls[0][0][0]["unique"]).toEqual([
+        "name",
+      ]);
+    });
+
+    it("should skip when unique keys is already added", async () => {
+      (loadData as jest.Mock).mockImplementation(
+        jest.fn(({ flag }) => {
+          if (flag === "collection-info")
+            return [{ collectionName: "testCollection", unique: ["name"] }];
+          return structuredClone(mockCollectionData);
+        })
+      );
+      await collection.addUniqueKey("name");
+      expect(saveData).not.toBeCalled();
+    });
+
+    it("should return undefined when a provided unique keys is not found", async () => {
+      const result = await collection.removeUniqueKey("name");
+
+      expect(result).toBeUndefined();
+      expect(saveData).not.toBeCalled();
+    });
   });
 });

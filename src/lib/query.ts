@@ -35,7 +35,10 @@ export class Query<U extends Object> {
 
     // select
     if (select)
-      this.collectionDB = this.selectProperties(this.collectionDB, select);
+      this.collectionDB = this.selectProperties(
+        this.collectionDB,
+        select as Array<keyof U>
+      );
 
     // limit
     this.limitDocument(limit);

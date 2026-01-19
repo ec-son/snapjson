@@ -1,15 +1,19 @@
 import { open, readFile, stat } from "node:fs/promises";
 import {
   compare,
-  defineDocument,
+  encodeData,
+  decodeData,
   formatSize,
+  getPath,
   isEqual,
-  loadData,
-  saveData,
   sizeFile,
 } from "../src/utils/utils.func";
-import { DataBaseType } from "../src/types/orm.type";
+import { loadData } from "../src/utils/load-data";
+import { normalize } from "node:path";
+import * as cryptoModule from "../src/utils/cryptoUtil";
 
+jest.mock("../src/utils/cryptoUtil");
+jest.mock("../src/utils/load-data");
 jest.mock("node:fs/promises", () => {
   return {
     ...jest.requireActual("fs"),
@@ -30,112 +34,14 @@ const mockClose = jest.fn();
 const path_db = "db.json";
 
 /**
- * saveData
- * loadData
- * defineDocument
+ * encodeData
+ * decodeData
+ * getPath
  * sizeFile
  * formatSize
  * isEqual
  * compare
  */
-describe("saving data into database", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-  const data: DataBaseType = {} as DataBaseType;
-
-  const table = [
-    {
-      path: path_db,
-      data,
-      expected: [JSON.stringify(data), { encoding: "utf-8" }],
-    },
-    {
-      path: path_db,
-      data: undefined,
-      expected: [JSON.stringify(data), { encoding: "utf-8" }],
-    },
-  ];
-  it.each(table)(
-    "should save data into database",
-    async ({ path, data, expected }) => {
-      await saveData(path, data as DataBaseType);
-      expect(mockWriteFile).toHaveBeenNthCalledWith(1, ...expected);
-    }
-  );
-
-  it("should create path if it doesn't exist", async () => {
-    (open as unknown as jest.Mock).mockRejectedValueOnce({ code: "ENOENT" });
-    await saveData(path_db, data);
-    expect(mockWriteFile).toHaveBeenNthCalledWith(1, JSON.stringify(data), {
-      encoding: "utf-8",
-    });
-  });
-
-  it("should close the file after writing", async () => {
-    await saveData(path_db, data);
-    expect(mockClose).toBeCalled();
-  });
-
-  it("should throw when saving", async () => {
-    (open as unknown as jest.Mock).mockRejectedValue(new Error("Async error"));
-    await expect(saveData(path_db, data)).rejects.toThrow();
-  });
-});
-
-describe("loading data from database", () => {
-  const table1 = [
-    { data: '{"user" : []}', expected: { user: [] } },
-    { data: undefined },
-    { data: "" },
-    { data: "   " },
-    {
-      data: `
-    
-    `,
-    },
-    {
-      data: `
-    
-    {}
-
-    `,
-    },
-  ];
-  it.each(table1)(
-    "should load data from database",
-    async ({ data, expected }) => {
-      if (!expected) {
-        (expected as any) = {};
-      }
-      (readFile as unknown as jest.Mock).mockResolvedValue(data);
-      await expect(loadData(path_db)).resolves.toEqual(expected);
-    }
-  );
-
-  it("should throw an error when data is not valid JSON", async () => {
-    (readFile as unknown as jest.Mock).mockResolvedValue("data");
-    await expect(loadData(path_db)).rejects.toThrow();
-  });
-});
-
-describe("define document", () => {
-  it("should return an object with specified properties", () => {
-    const document = { __id: 1, name: "name", age: 12 };
-    const expected = defineDocument<typeof document>(document, path_db, "user");
-    expect(defineDocument(document, path_db, "user")).toEqual(expected);
-  });
-
-  it("should return an object with specified properties", () => {
-    const document = [
-      { __id: 1, name: "name1", age: 17 },
-      { __id: 2, name: "name2", age: 18 },
-      { __id: 3, name: "name3", age: 19 },
-    ];
-    const expected = defineDocument<typeof document>(document, path_db, "user");
-    expect(defineDocument(document, path_db, "user")).toEqual(expected);
-  });
-});
 
 describe("format size", () => {
   const table1 = [
@@ -152,21 +58,44 @@ describe("format size", () => {
     expect(formatSize(size)).toBe(expected);
   });
 
-  it("should rteurn database size", async () => {
+  it("should retrn database size", async () => {
     (stat as unknown as jest.Mock).mockResolvedValue({ size: 100234 });
-    await expect(sizeFile(path_db)).resolves.toBe("97.9 KB");
+    await expect(sizeFile()).resolves.toBe("97.9 KB");
   });
 
   it("should return O B when database file doesn't exist", async () => {
     (stat as unknown as jest.Mock).mockRejectedValueOnce({ code: "ENOENT" });
-    await expect(sizeFile(path_db)).resolves.toBe("0 B");
+    await expect(sizeFile()).resolves.toBe("0 B");
   });
 
   it("should throw when getting database size", async () => {
     (stat as unknown as jest.Mock).mockRejectedValueOnce(
       new Error("Unknown error")
     );
-    await expect(sizeFile(path_db)).rejects.toThrow();
+    await expect(sizeFile()).rejects.toThrow();
+  });
+
+  it("should return database size when splitfile is false", async () => {
+    (stat as jest.Mock).mockResolvedValueOnce({ size: 10 });
+
+    await expect(sizeFile()).resolves.toBe("10 B");
+  });
+
+  it("should return database size when splitfile is true", async () => {
+    (loadData as jest.Mock).mockResolvedValueOnce([
+      { collectionName: "student", unique: [] },
+      { collectionName: "marks", unique: [] },
+    ]);
+
+    (stat as jest.Mock).mockImplementation((flag) => {
+      if (flag === normalize("db/__metadata__.json")) return { size: 10 };
+      else if (flag === normalize("db/student.json")) return { size: 10 };
+      else if (flag === normalize("db/marks.json")) return { size: 10 };
+    });
+
+    await expect(
+      sizeFile({ splitFile: true, flag: "orm-info", path_db: "db" })
+    ).resolves.toBe("30 B");
   });
 });
 
@@ -214,4 +143,111 @@ describe("compare function", () => {
       expect(compare(a, b, op as any)).toBe(expected);
     }
   );
+});
+
+describe("getPath", () => {
+  it("should return __metadata__.json for orm-info", () => {
+    expect(getPath({ splitFile: true, flag: "orm-info", path_db: "/db" })).toBe(
+      normalize("/db/__metadata__.json")
+    );
+  });
+  it("should return collection-info file path", () => {
+    expect(
+      getPath({ splitFile: true, flag: "collection-info", path_db: "/db" })
+    ).toBe(normalize("/db/__metadata__.json"));
+  });
+  it("should return specific file path", () => {
+    expect(getPath({ splitFile: true, flag: "users", path_db: "/db" })).toBe(
+      normalize("/db/users.json")
+    );
+  });
+
+  it("should return file path with .json.encrpt extention", () => {
+    expect(
+      getPath({
+        splitFile: true,
+        flag: "users",
+        path_db: "/db",
+        encrypted: true,
+      })
+    ).toBe(normalize("/db/users.json.crypt"));
+  });
+
+  it("should return single file db.json if not split", () => {
+    expect(getPath({ splitFile: false, flag: "any", path_db: "/db" })).toBe(
+      normalize("/db/db.json")
+    );
+  });
+});
+
+describe("encodeData", () => {
+  const opt = {
+    path_db: "/db",
+    splitFile: false,
+    flag: "any",
+  };
+
+  it("should return encrypted string if opt.encrypted is true", async () => {
+    (cryptoModule.encrypt as jest.Mock).mockReturnValue("enc::mocked");
+    const result = await encodeData(
+      { name: "Alice" },
+      { encrypted: true, secretKey: "key", salt: "salt", mode: "prod", ...opt }
+    );
+    expect(result).toBe("enc::mocked");
+    expect(cryptoModule.encrypt).toHaveBeenCalled();
+  });
+  it("should stringify normally in prod mode if not encrypted", async () => {
+    const result = await encodeData(
+      { name: "Bob" },
+      { encrypted: false, secretKey: "", salt: "", mode: "prod", ...opt }
+    );
+    expect(result).toBe(JSON.stringify({ name: "Bob" }));
+  });
+});
+
+describe("decodeData", () => {
+  const mockDecrypted =
+    '{"name":"John","createdAt":"2024-01-01T00:00:00.000Z"}';
+  const opt = {
+    path_db: "/db",
+    splitFile: false,
+    flag: "any",
+  };
+
+  beforeEach(() => {
+    (cryptoModule.decrypt as jest.Mock).mockReturnValue(mockDecrypted);
+  });
+  it("should decrypt if encrypted and prefixed with enc::", async () => {
+    const result = await decodeData("enc::xxx", {
+      encrypted: true,
+      secretKey: "key",
+      salt: "salt",
+      mode: "prod",
+      ...opt,
+    });
+    expect(result.name).toBe("John");
+    expect(result.createdAt).toBeInstanceOf(Date);
+  });
+  it("should parse JSON if not encrypted", async () => {
+    const raw = JSON.stringify({ name: "Test" });
+    const result = await decodeData(raw, {
+      encrypted: false,
+      secretKey: "",
+      salt: "",
+      mode: "prod",
+      ...opt,
+    });
+    expect(result.name).toBe("Test");
+  });
+  it("should throw error if encrypted is false but data is encrypted", async () => {
+    await expect(
+      decodeData("enc::xxx", {
+        encrypted: false,
+        secretKey: "",
+        salt: "",
+        mode: "prod",
+        ...opt,
+      })
+    ).rejects.toThrow(/Decryption error/);
+  });
 });

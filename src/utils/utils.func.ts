@@ -1,24 +1,47 @@
-import { dirname } from "path";
-import { Document } from "../lib/document";
-import { open, readFile, stat, mkdir } from "node:fs/promises";
-import { DataBaseType } from "../types/orm.type";
-import { DocumentDataType } from "../types/document-data.type";
+import { join } from "path";
+import { stat, rm } from "node:fs/promises";
+import {
+  CollectionInfoType,
+  DatabaseInfoOptionType,
+  RelationType,
+} from "../types/orm.type";
+import { decrypt, encrypt } from "./cryptoUtil";
+import { loadData } from "./load-data";
 
 /**
- * Loads data from database file.
- * @param path_db path to the database file.
- * @returns Returns data.
+ * Encodes the given data according to the options.
+ * If the data is to be encrypted, it will be encrypted using the secret key and salt.
+ * Otherwise, it will be converted to a JSON string.
+ * If the mode is "dev", the JSON string will be formatted with indentation of 2 spaces.
+ * @param {any} data - The data to be encoded.
+ * @param {DatabaseInfoOptionType} opt - The options for encoding the data.
+ * @returns {Promise<string>} The encoded data as a string.
  */
-async function loadData(path_db: string): Promise<DataBaseType> {
-  let data = "";
-  try {
-    data = await readFile(path_db, { encoding: "utf-8" });
-    if (!data || /^\s+$/.test(data)) return {};
-  } catch (error: any) {
-    if (error.code !== "ENOENT") throw error;
-    return {};
-  }
+export async function encodeData(
+  data: any,
+  opt: DatabaseInfoOptionType
+): Promise<string> {
+  if (opt.encrypted)
+    return encrypt(JSON.stringify(data), opt.secretKey, opt.salt);
+  else
+    return opt.mode === "dev"
+      ? JSON.stringify(data, null, 2)
+      : JSON.stringify(data);
+}
 
+/**
+ * Decodes the given data according to the options.
+ * If the data is encrypted, it will be decrypted using the secret key and salt.
+ * If the mode is "dev", the JSON string will be formatted with indentation of 2 spaces.
+ * If the data contains Date objects, they will be converted to ISO strings.
+ * @param {any} data - The data to be decoded.
+ * @param {DatabaseInfoOptionType} opt - The options for decoding the data.
+ * @returns {Promise<any>} The decoded data as a JSON object.
+ */
+export async function decodeData(
+  data: any,
+  opt: DatabaseInfoOptionType
+): Promise<any> {
   const reviver = (key: string, value: string) => {
     const dateRegex = new RegExp(
       "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}",
@@ -29,34 +52,50 @@ async function loadData(path_db: string): Promise<DataBaseType> {
     }
     return value;
   };
-  try {
+
+  if (opt.encrypted) {
+    if (data.startsWith("enc::"))
+      return JSON.parse(decrypt(data, opt.secretKey, opt.salt), reviver);
     return JSON.parse(data, reviver);
-  } catch (error: any) {
-    throw new Error(`Can't Load Database: ${error.message}`);
+  } else {
+    if (data.startsWith("enc::"))
+      throw new Error(
+        "Decryption error: the data appears to be encrypted but 'encrypted' option is false. Set 'ecrypted: true' to decrypt properly."
+      );
+    return JSON.parse(data, reviver);
   }
 }
 
 /**
- * Saves data to the database.
- * @param path_db path to the database file.
- * @param data data to save to the database.
+ * Returns the path of the database file.
+ * If splitFile is true, the path will be determined according to the flag option.
+ * If flag is "orm-info" or "collection-info", the path will be "<path_db>/__metadata__.json".
+ * Otherwise, the path will be "<path_db>/<flag>.json".
+ * If splitFile is false, the path will be "<path_db>/db.json".
+ * If encrypted is true, the path will have ".crypt" appended to the end.
+ * @param {DatabaseInfoOptionType} opt - The options for getting the path of the database file.
+ * @returns {string} The path of the database file.
  */
-async function saveData(path_db: string, data: DataBaseType) {
-  let fd = null;
-  try {
-    if (!data) data = {};
-    fd = await open(path_db, "w");
-  } catch (error: any) {
-    if (error.code !== "ENOENT") throw error;
-    const basepath = dirname(path_db);
-    await mkdir(basepath, { recursive: true });
-    fd = await open(path_db, "w");
-  }
-  try {
-    await fd.writeFile(JSON.stringify(data, null, 2), { encoding: "utf-8" });
-  } finally {
-    if (fd) await fd.close();
-  }
+export function getPath(opt: DatabaseInfoOptionType): string {
+  let path_db = "";
+  if (opt.splitFile) {
+    if (opt.flag === "orm-info" || opt.flag === "collection-info")
+      path_db = join(opt.path_db, "__metadata__.json");
+    else path_db = join(opt.path_db, opt.flag + ".json");
+  } else path_db = join(opt.path_db, "db.json");
+
+  if (opt.encrypted) path_db += ".crypt";
+  return path_db;
+}
+
+/**
+ * Removes the file at the specified path.
+ * @param {string} path - Path to the file to be removed.
+ * @returns {Promise<void>} A promise that resolves when the file has been removed.
+ * @throws {Error} If the file does not exist or the removal fails.
+ */
+export async function removeFile(path: string) {
+  await rm(path);
 }
 
 /**
@@ -64,11 +103,37 @@ async function saveData(path_db: string, data: DataBaseType) {
  * @param path_db path to the database file.
  * @returns Returns size of the database file.
  */
-async function sizeFile(path_db: string): Promise<string> {
+async function sizeFile(opt?: DatabaseInfoOptionType): Promise<string> {
+  if (!opt) {
+    opt = {
+      path_db: "db",
+      flag: "orm-info",
+      splitFile: false,
+    };
+  } else opt.flag = "orm-info";
+
   try {
-    if (!path_db) throw new Error(`Unable to find database file`);
-    const statFile = await stat(path_db);
-    return formatSize(statFile.size);
+    if (!opt.splitFile) {
+      const path_db = getPath(opt);
+      const statFile = await stat(path_db);
+      return formatSize(statFile.size);
+    }
+
+    const collectionTab = (
+      (await loadData({
+        ...opt,
+        flag: "collection-info",
+      })) as CollectionInfoType[]
+    ).map((el) => el.collectionName);
+    let size = (await stat(getPath(opt))).size;
+
+    for (const collectionName of collectionTab) {
+      try {
+        size += (await stat(getPath({ ...opt, flag: collectionName }))).size;
+      } catch (error) {}
+    }
+
+    return formatSize(size);
   } catch (error: any) {
     if (error.code === "ENOENT") {
       return "0 B";
@@ -89,38 +154,9 @@ function convertToObject(tab: string | Array<string>, _obj?: {}) {
 }
 
 /**
- * Creates instance of document.
- * @param documents one document or array of documents.
- * @param path_id path to the database file.
- * @param collectionName name of the collection.
- * @returns Returns instance of document or an array of documents.
- */
-function defineDocument<T extends Object>(
-  documents: T | T[],
-  path_id: string,
-  collectionName: string
-): DocumentDataType<T> | Array<DocumentDataType<T>> {
-  if (!Array.isArray(documents))
-    return new Document<T>(
-      structuredClone(documents),
-      path_id,
-      collectionName
-    ) as unknown as DocumentDataType<T>;
-  else
-    return documents.map(
-      (el) =>
-        new Document<T>(
-          structuredClone(el),
-          path_id,
-          collectionName
-        ) as unknown as DocumentDataType<T>
-    );
-}
-
-/**
- * Format size.
- * @param sizeInBytes size in octets
- * @returns Returns the size formatted.
+ * Formats the file size with the appropriate unit.
+ * @param sizeInBytes - Size in bytes
+ * @returns Returns the formatted size string (e.g., "1.5 MB")
  */
 function formatSize(sizeInBytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -135,12 +171,13 @@ function formatSize(sizeInBytes: number): string {
 }
 
 /**
- * Compare two values.
- * @param a
- * @param b
- * @returns Returns true if they are equal, false otherwise
+ * Compares two values for deep equality.
+ * Supports primitives, Date objects, and arrays.
+ * @param a - First value to compare
+ * @param b - Second value to compare
+ * @returns Returns true if values are deeply equal, false otherwise
  * @example
- *  console.log(isEqual(1, 2)); // true
+ *  console.log(isEqual(1, 2)); // false
  *  console.log(isEqual("hello", "hello")); // true
  *  console.log(isEqual(new Date(), new Date())); // true
  *  console.log(isEqual([1, 3, 2], [2, 1, 3])); // true
@@ -161,11 +198,11 @@ function isEqual(a: any, b: any) {
 }
 
 /**
- * Compares two values (namber or string, Date).
- * @param a
- * @param b
- * @param op operator, gt, gte, lt, lte
- * @returns returns a boolean, true or false
+ * Compares two values (number, string, or Date) using the specified operator.
+ * @param a - First value to compare
+ * @param b - Second value to compare
+ * @param op - Operator: "gt" (greater than), "gte" (greater or equal), "lt" (less than), "lte" (less or equal)
+ * @returns Returns true if the condition is met, false otherwise
  * @example
  * console.log(compare(2, 1, "gt")); // true
  * console.log(compare(1, 2, "gt")); // false
@@ -199,13 +236,4 @@ function compare(
   return false;
 }
 
-export {
-  loadData,
-  saveData,
-  sizeFile,
-  convertToObject,
-  defineDocument,
-  formatSize,
-  isEqual,
-  compare,
-};
+export { sizeFile, convertToObject, formatSize, isEqual, compare };

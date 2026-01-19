@@ -1,35 +1,31 @@
+import { defineCollection } from "../utils/shortcutFunc";
 import { isEqual } from "../utils/utils.func";
 import { Collection } from "./collection";
-import { defineCollection } from "./snapjson";
+import { DatabaseConfigType, DatabaseInfoOptionType } from "../types/orm.type";
+import { getOpts } from "../utils/opts.func";
 
 export class Document<T extends Object> {
   private id: number = -1;
   private collection: Collection<T> | null = null;
   [key: string]: any;
-  private privateProps = [
-    "collectionName",
-    "path_id",
-    "document",
-    "id",
-    "collection",
-    "__id",
-    "privateProps",
-  ];
+  private _opt: DatabaseInfoOptionType;
 
   constructor(
     private document: T,
-    private path_id: string,
-    private collectionName: string
+    private collectionName: string,
+    opt: DatabaseConfigType
   ) {
-    Object.keys(this.document).forEach((key: string) => {
-      this[key] = this.document[key as keyof T];
-    });
+    for (const key of Object.keys(document)) {
+      this[key] = document[key as keyof T];
+    }
 
     if ((document as { __id?: number }).__id) {
-      this.id = (document as { __id?: number }).__id!;
       const { __id, ...rest } = document as any;
-      document = rest;
+      this.id = __id;
+      this.document = rest;
     }
+
+    this._opt = { ...getOpts(opt), flag: collectionName };
   }
 
   /**
@@ -37,12 +33,10 @@ export class Document<T extends Object> {
    * @returns Converted document.
    */
   toObject(): T {
-    const document = structuredClone(this.document);
+    const document: typeof this.document = {} as any;
 
-    for (const key of Object.keys(this)) {
-      if (this.hasOwnProperty(key) && !this.privateProps.includes(key)) {
-        document[key as keyof T] = this[key];
-      }
+    for (const key of Object.keys(this.document)) {
+      document[key as keyof T] = this[key];
     }
 
     if (this.id !== -1) (document as { __id?: number })["__id"] = this.id;
@@ -59,35 +53,64 @@ export class Document<T extends Object> {
 
   private async init() {
     if (this.collection) return;
-    this.collection = await defineCollection<T>(
-      this.collectionName,
-      this.path_id
-    );
+    this.collection = await defineCollection<T>(this.collectionName, this._opt);
   }
 
   /**
-   * Updates this document.
-   * @returns Returns true if the document is successfully updated, false otherwise.
+   * Saves this document.
+   * @returns Returns true if the document is successfully saved, false otherwise.
    */
   async save() {
     await this.init();
     let document = this.toObject();
 
     let data: T = {} as T;
-    (Object.keys(this.document) as Array<keyof T>).forEach((key) => {
+
+    for (const key of Object.keys(this.document)) {
       if (!isEqual(this.document[key], document[key]))
         data[key] = document[key];
-    });
+    }
+    if (!data || Object.keys(data).length < 1) return false;
 
-    if ((data as { __id?: number }).__id) {
-      const { __id, ...rest } = data as any;
-      data = rest;
+    const saved =
+      (await this.collection?.updateOne(data, { __id: this.id } as any)) !==
+      null;
+
+    if (saved) {
+      for (const key of Object.keys(data)) {
+        this.document[key] = data[key];
+      }
+    }
+    return saved;
+  }
+
+  /**
+   * Updates this document.
+   *
+   * Updates the properties of the document and updates the document in the database if the `save` flag is set to true.
+   *
+   * @param obj - The properties to update.
+   * @param save - If true the document will be saved in the database.
+   * @returns - Returns true if the document is successfully updated, false otherwise.
+   */
+  async update(obj: Partial<T>, save?: boolean): Promise<boolean> {
+    if (!obj || Object.keys(obj).length < 1) return false;
+
+    for (const key of Object.keys(obj)) {
+      if (
+        !isEqual(this[key], obj[key]) &&
+        Object.keys(this.document).includes(key)
+      )
+        // updating properties
+        this[key] = obj[key] as any;
     }
 
-    return (
-      (await this.collection?.updateOne(data, { __id: this.id } as any)) !==
-      null
-    );
+    if (save) {
+      // saving the updated document to the database
+      return await this.save();
+    }
+
+    return true;
   }
 
   /**
